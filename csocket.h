@@ -6,7 +6,7 @@
 #include <windows.h>
 #else
 #include <netinet/in.h>
-#include <asm/errno.h>
+#include <cerrno>
 #include <unistd.h>
 #include <cstring>
 #endif

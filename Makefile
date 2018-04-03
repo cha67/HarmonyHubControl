@@ -1,11 +1,21 @@
 # build helloworld executable when user executes "make" 
 
-HarmonyHubControl : HarmonyHubControl.o
-	$(CC) $(LDFLAGS) HarmonyHubControl.o csocket.o -o HarmonyHubControl -lstdc++
+CC       = $(CROSS_COMPILE)g++
+CFLAGS  +=  -c -Wall $(EXTRAFLAGS)
+LDFLAGS += -lstdc++
+HHC_OBJ  = $(patsubst %.cpp,%.o,$(wildcard *.cpp)) $(patsubst %.cpp,%.o,$(wildcard jsoncpp/*.cpp))
+DEPS     = $(wildcard *.h) $(wildcard jsoncpp/*.h)
 
-HarmonyHubControl.o: HarmonyHubControl.cpp 
-	$(CC) $(CFLAGS) -c HarmonyHubControl.cpp csocket.cpp -lstdc++ 
+
+HarmonyHubControl : $(HHC_OBJ)
+	$(CC) $(HHC_OBJ) $(LDFLAGS) -o HarmonyHubControl
+
+%.o: %.cpp $(DEP)
+	$(CC) $(CFLAGS) $(EXTRAFLAGS) $< -o $@
+
+#HarmonyHubControl.o: HarmonyHubControl.cpp 
+#	$(CC) $(CFLAGS) -c HarmonyHubControl.cpp csocket.cpp -lstdc++ 
 
 # remove object files and executable when user executes "make clean"
 clean:
-	rm *.o HarmonyHubControl 
+	rm $(HHC_OBJ) HarmonyHubControl 

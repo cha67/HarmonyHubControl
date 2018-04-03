@@ -25,8 +25,11 @@
 #include <map>
 #include <vector>
 #include "csocket.h"
-#include <iostream>
-#include <fstream>
+
+#include <sstream>
+#include "jsoncpp/json.h"
+
+
 using namespace std;
 
 std::string errorString;
@@ -586,7 +589,11 @@ int submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, s
         pos = strData.find("![CDATA[{");
         if(pos != std::string::npos)
         {
-            resultString = "Logitech Harmony Configuration : \n" + strData.substr(pos + 9);
+            if(strCommand == "get_config")
+		resultString = "Logitech Harmony Configuration : \n" + strData.substr(pos + 8);
+	    else
+		resultString = strData.substr(pos + 8);
+
         }
     }
     else if (strCommand == "start_activity" || strCommand == "start_activity_raw")
@@ -606,204 +613,111 @@ int submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, s
 
 int parseAction(const std::string& strAction, std::vector<Action>& vecDeviceActions, const std::string& strDeviceID)
 {
-    Action a;
-    const std::string commandTag = "\\\"command\\\":\\\"";
-    std::string::size_type commandStart = strAction.find(commandTag);
-   std::string::size_type commandEnd = strAction.find("\\\",\\\"", commandStart);
-    a.m_strCommand = strAction.substr(commandStart + commandTag.length(), commandEnd - commandStart - commandTag.length());
-    
-    const std::string deviceIdTag = "\\\"deviceId\\\":\\\"";
-    std::string::size_type deviceIDStart = strAction.find(deviceIdTag, commandEnd);
+	Json::Value j_action;
+	Json::Reader jReader;
+	if (!jReader.parse(strAction.c_str(), j_action))
+		return 1;
 
-    const std::string nameTag = "\\\"}\",\"name\":\"";
-    std::string::size_type deviceIDEnd = strAction.find(nameTag, deviceIDStart);
+	Action a;
+	a.m_strName = j_action["name"].asString();
+	a.m_strLabel = j_action["label"].asString();
 
-    std::string commandDeviceID = strAction.substr(deviceIDStart + deviceIdTag.length(), deviceIDEnd - deviceIDStart - deviceIdTag.length());
-    if(commandDeviceID != strDeviceID)
-    {
-        return 1;
-    }
+	std::string actionline = j_action["action"].asString();
 
-    std::string::size_type nameStart = deviceIDEnd + nameTag.length();
+	std::stringstream ssaction;
+	bool isescape = false;
+	for (size_t i = 0; i < actionline.length(); i++)
+	{
+		if ((actionline[i] == '\\') && (!isescape))
+			isescape = true;
+		else
+		{
+			ssaction << actionline[i];
+			isescape = false;
+		}
+	}
 
-    const std::string labelTag = "\",\"label\":\"";
-    std::string::size_type nameEnd = strAction.find(labelTag, nameStart);
+	if (!jReader.parse(ssaction.str().c_str(), j_action))
+		return 1;
+	a.m_strCommand = j_action["command"].asString();
 
-    a.m_strName = strAction.substr(nameStart, nameEnd - nameStart);
-
-     std::string::size_type labelStart = nameEnd + labelTag.length();
-     std::string::size_type labelEnd = strAction.find("\"}", labelStart);
-
-    a.m_strLabel = strAction.substr(labelStart, labelEnd - labelStart);
-
-    vecDeviceActions.push_back(a);
-    return 0;
+	std::string commandDeviceID = j_action["deviceId"].asString();
+	if(commandDeviceID != strDeviceID)
+		return 1;
+	vecDeviceActions.push_back(a);
+	return 0;
 }
 
 int parseFunction(const std::string& strFunction, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
 {
-    Function f;
-    std::string::size_type functionNameEnd = strFunction.find("\",\"function\":[{");
-    if(functionNameEnd == std::string::npos)
-    {
-        return 1;
-    }
-    
-    f.m_strName = strFunction.substr(0, functionNameEnd);
+	Json::Value j_func;
+	Json::Reader jReader;
+	if (!jReader.parse(strFunction.c_str(), j_func))
+		return 1;
 
-    const std::string actionTag = "\"action\":\"";
-    std::string::size_type actionStart = strFunction.find(actionTag, functionNameEnd);
-    
-    while(actionStart != std::string::npos)
-    {
-        const std::string labelTag = "\"label\":\"";
-        std::string::size_type actionEnd = strFunction.find(labelTag, actionStart);
-        if(actionEnd == std::string::npos)
-        {
-            return 1;
-        }
-        actionEnd = strFunction.find("\"}", actionEnd + labelTag.length());
+	Function f;
+	f.m_strName = j_func["name"].asString();
 
-        std::string strAction = strFunction.substr(actionStart + actionTag.length(), actionEnd - actionStart - actionTag.length());
-        parseAction(strAction, f.m_vecActions, strDeviceID);
-        
-        actionStart = strFunction.find(actionTag, actionEnd);
-    }
-
-    vecDeviceFunctions.push_back(f);
-
-    return 0;
+	size_t l = j_func["function"].size();
+	for (size_t i = 0; i < l; ++i)
+	{
+		parseAction(j_func["function"][(int)(i)].toStyledString(), f.m_vecActions, strDeviceID);
+	}	
+	vecDeviceFunctions.push_back(f);
+	return 0;
 }
 
 int parseControlGroup(const std::string& strControlGroup, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
 {
-    const std::string nameTag = "{\"name\":\"";
-     std::string::size_type funcStartPos = strControlGroup.find(nameTag);
-      std::string::size_type funcEndPos = strControlGroup.find("]}"); 
-   while(funcStartPos != std::string::npos)
-    {
-        std::string strFunction = strControlGroup.substr(funcStartPos + nameTag.length(), funcEndPos - funcStartPos - nameTag.length());
-        if(parseFunction(strFunction, vecDeviceFunctions, strDeviceID) != 0)
-        {
-            return 1;
-        }
-        funcStartPos = strControlGroup.find(nameTag, funcEndPos);
-        funcEndPos = strControlGroup.find("}]}", funcStartPos);
-    }
+	Json::Value j_cgrp;
+	Json::Reader jReader;
+	if (!jReader.parse(strControlGroup.c_str(), j_cgrp))
+		return 1;
 
-    return 0;
+	size_t l = j_cgrp.size();
+
+	for (size_t i = 0; i < l; ++i)
+	{
+		if(parseFunction(j_cgrp[(int)(i)].toStyledString(), vecDeviceFunctions, strDeviceID) != 0)
+			return 1;
+	
+	}	
+	return 0;
 }
 
 int parseConfiguration(const std::string& strConfiguration, std::map< std::string, std::string >& mapActivities, std::vector< Device >& vecDevices)
 {
-    std::string activityTypeDisplayNameTag = "\",\"activityTypeDisplayName\":\"";
-    std::string::size_type activityTypeDisplayNameStartPos = strConfiguration.find(activityTypeDisplayNameTag);    while(activityTypeDisplayNameStartPos != std::string::npos)
-    {
-        std::string::size_type activityStart = strConfiguration.rfind("{", activityTypeDisplayNameStartPos);
-        if(activityStart != std::string::npos )
-        {
-            std::string activityString = strConfiguration.substr(activityStart+1, activityTypeDisplayNameStartPos - activityStart-1);
-            
-            std::string labelTag = "\"label\":\"";
-            std::string idTag = "\",\"id\":\"";
-           std::string::size_type labelStartPos = activityString.find(labelTag);
-           std::string::size_type idStartPos = activityString.find(idTag, labelStartPos);
-                        
-            // Try to pick up the label
-            std::string strActivityLabel = activityString.substr(labelStartPos+9, idStartPos-labelStartPos-9);
-            idStartPos += idTag.length();
+	Json::Value j_conf;
+	Json::Reader jReader;
+	if (!jReader.parse(strConfiguration.c_str(), j_conf))
+		return 1;
 
-            // Try to pick up the ID
-            std::string strActivityID = activityString.substr(idStartPos, activityString.length() - idStartPos);
-
+	size_t l = j_conf["activity"].size();
+	for (size_t i = 0; i < l; ++i)
+	{
+		std::string strActivityLabel = j_conf["activity"][(int)(i)]["label"].asString();
+		std::string strActivityID = j_conf["activity"][(int)(i)]["id"].asString();
             mapActivities.insert(std::map< std::string, std::string>::value_type(strActivityID, strActivityLabel));
-        }
-        activityTypeDisplayNameStartPos = strConfiguration.find(activityTypeDisplayNameTag, activityTypeDisplayNameStartPos+activityTypeDisplayNameTag.length());
-    }
+	}
 
-    // Search for devices and commands
-    std::string deviceDisplayNameTag = "deviceTypeDisplayName";
-    std::string::size_type deviceTypeDisplayNamePos = strConfiguration.find(deviceDisplayNameTag);
-    while(deviceTypeDisplayNamePos != std::string::npos && deviceTypeDisplayNamePos != strConfiguration.length())
-    {
-        //std::string deviceString = strConfiguration.substr(deviceTypeDisplayNamePos);
-        std::string::size_type nextDeviceTypeDisplayNamePos = strConfiguration.find(deviceDisplayNameTag, deviceTypeDisplayNamePos + deviceDisplayNameTag.length());
-        if(nextDeviceTypeDisplayNamePos == std::string::npos)
-        {
-            nextDeviceTypeDisplayNamePos = strConfiguration.length();
-        }
+	// Search for devices and commands
+	l = j_conf["device"].size();
+	for (size_t i = 0; i < l; ++i)
+	{
+	        Device d;
 
-        Device d;
+		d.m_strID = j_conf["device"][(int)(i)]["id"].asString();
+		d.m_strLabel = j_conf["device"][(int)(i)]["label"].asString();
+		d.m_strType = j_conf["device"][(int)(i)]["type"].asString();
+		d.m_strManufacturer = j_conf["device"][(int)(i)]["manufacturer"].asString();
+		d.m_strModel = j_conf["device"][(int)(i)]["model"].asString();
 
-        // Search for commands
-        const std::string controlGroupTag = ",\"controlGroup\":[";
-        const std::string controlPortTag = "],\"ControlPort\":";
-        std::string::size_type controlGroupStartPos = strConfiguration.find(controlGroupTag, deviceTypeDisplayNamePos);
-	std::string::size_type controlGroupEndPos = strConfiguration.find(controlPortTag, controlGroupStartPos + controlGroupTag.length());
-	std::string::size_type deviceStartPos = strConfiguration.rfind("{", deviceTypeDisplayNamePos);
-	std::string::size_type deviceEndPos = strConfiguration.find("}", controlGroupEndPos);
+		// Parse Commands
+		parseControlGroup(j_conf["device"][(int)(i)]["controlGroup"].toStyledString(), d.m_vecFunctions, d.m_strID);
 
-        if(deviceStartPos != std::string::npos && deviceEndPos != std::string::npos)
-        {
-            // Try to pick up the ID
-            const std::string idTag = "\",\"id\":\"";
-            std::string::size_type idStartPos = strConfiguration.find(idTag, deviceStartPos);
-            if(idStartPos != std::string::npos && idStartPos < deviceEndPos)
-            {
-                std::string::size_type idEndPos = strConfiguration.find("\",\"", idStartPos + idTag.length());
-                d.m_strID = strConfiguration.substr(idStartPos+idTag.length(), idEndPos-idStartPos-idTag.length());
-            }
-            else
-            {
-                deviceTypeDisplayNamePos = nextDeviceTypeDisplayNamePos ;
-                continue;
-            }
-
-            // Definitely have a device
-
-            // Try to pick up the label
-            const std::string labelTag = "\"label\":\"";
-            std::string::size_type labelStartPos = strConfiguration.find(labelTag, deviceStartPos);
-            if(labelStartPos != std::string::npos && labelStartPos < deviceEndPos)
-            {
-                std::string::size_type labelEndPos = strConfiguration.find("\",\"", labelStartPos + labelTag.length());
-                d.m_strLabel = strConfiguration.substr(labelStartPos + labelTag.length(), labelEndPos-labelStartPos - labelTag.length());
-            }
-
-            // Try to pick up the type
-            std::string typeTag = ",\"type\":\"";
-            std::string::size_type typeStartPos = strConfiguration.find(typeTag, deviceStartPos);            if(typeStartPos != std::string::npos && typeStartPos < deviceEndPos)
-            {
-                std::string::size_type typeEndPos = strConfiguration.find("\",\"", typeStartPos + typeTag.length());
-                d.m_strType = strConfiguration.substr(typeStartPos + typeTag.length(), typeEndPos - typeStartPos - typeTag.length());
-            }
-
-            // Try to pick up the manufacturer
-            std::string manufacturerTag = "manufacturer\":\"";
-            std::string::size_type manufacturerStartPos = strConfiguration.find(manufacturerTag, deviceStartPos);            if(manufacturerStartPos != std::string::npos && manufacturerStartPos < deviceEndPos)
-            {
-                std::string::size_type manufacturerEndPos = strConfiguration.find("\",\"", manufacturerStartPos + manufacturerTag.length());
-                d.m_strManufacturer = strConfiguration.substr(manufacturerStartPos+15, manufacturerEndPos-manufacturerStartPos-manufacturerTag.length());
-            }
-
-            // Try to pick up the model
-            std::string modelTag = "model\":\"";
-            std::string::size_type modelStartPos = strConfiguration.find(modelTag, deviceStartPos);
-            if(modelStartPos != std::string::npos && modelStartPos < deviceEndPos)
-            {
-                std::string::size_type modelEndPos = strConfiguration.find("\",\"", modelStartPos + modelTag.length());
-                d.m_strModel = strConfiguration.substr(modelStartPos+modelTag.length(), modelEndPos-modelStartPos-modelTag.length());
-            }
-
-            // Parse Commands
-            std::string strControlGroup = strConfiguration.substr(controlGroupStartPos + controlGroupTag.length(), controlGroupEndPos - controlGroupStartPos - controlGroupTag.length());
-            parseControlGroup(strControlGroup, d.m_vecFunctions, d.m_strID);
-
-            vecDevices.push_back(d);
-        }
-        deviceTypeDisplayNamePos = nextDeviceTypeDisplayNamePos;
-    }
-    return 0;
+		vecDevices.push_back(d);
+	}
+	return 0;
 }
 
 
@@ -1048,6 +962,9 @@ int main(int argc, char * argv[])
             return 1;
         }
 
+	ofstream config("config.json");
+	config << ("%s\n\n", resultString.c_str());
+
         if(strCommand == "list_activities" || strCommand == "list_activities_raw" )
         {
             resultString = "{";
@@ -1155,8 +1072,6 @@ int main(int argc, char * argv[])
 			myfile << ("%s\n\n", resultString.c_str());
         }
         log("PARSE ACTIVITIES AND DEVICES   : SUCCESS", bQuietMode);
-		ofstream config("config.json");
-		config << ("%s\n\n", resultString.c_str());
     }
 	
 
