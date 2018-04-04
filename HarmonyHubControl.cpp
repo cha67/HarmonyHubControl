@@ -925,6 +925,7 @@ int main(int argc, char * argv[])
         strCommand == "list_devices"                || 
         strCommand == "list_devices_raw"            || 
         strCommand == "list_commands"               || 
+        strCommand == "list_commands_raw"           || 
         strCommand == "list_device_commands"        || 
         strCommand == "list_device_commands_raw"    || 
         strCommand == "get_config")
@@ -943,6 +944,8 @@ int main(int argc, char * argv[])
     
     if(lstrCommand == "get_config_raw")
     {
+	std::string prettyheader="";
+
         std::map< std::string, std::string> mapActivities;
         std::vector< Device > vecDevices;
         if(parseConfiguration(resultString, mapActivities, vecDevices) == 1)
@@ -961,7 +964,7 @@ int main(int argc, char * argv[])
 
             if(strCommand == "list_activities")
             {
-                resultString = "Activities Available via Harmony : \n\n";
+                prettyheader = "Activities Available via Harmony : \n\n";
             }
         
             std::map< std::string, std::string>::iterator it = mapActivities.begin();
@@ -986,7 +989,7 @@ int main(int argc, char * argv[])
 	    resultString ="{";
             if( strCommand == "list_devices" )
             {
-                cout << "Devices Controllable via Harmony : \n\n";
+                prettyheader = "Devices Controllable via Harmony : \n\n";
             }
 
             std::vector< Device >::iterator it = vecDevices.begin();
@@ -1011,7 +1014,7 @@ int main(int argc, char * argv[])
             
             if(strCommand == "list_commands")
             {
-                cout << "Devices Controllable via Harmony with Commands : \n\n";
+                prettyheader = "Devices Controllable via Harmony with Commands : \n\n";
             }
             std::vector< Device >::iterator it = vecDevices.begin();
             std::vector< Device >::iterator ite = vecDevices.end();
@@ -1028,7 +1031,7 @@ int main(int argc, char * argv[])
             
             if(strCommand == "list_device_commands")
             {
-                cout << "Harmony Commands for Device: \n\n";
+                prettyheader = "Harmony Commands for Device: \n\n";
             }
             
             std::vector< Device >::iterator it = vecDevices.begin();
@@ -1062,6 +1065,8 @@ int main(int argc, char * argv[])
 			myfile << ("%s\n", resultString.c_str());
         }
         log("PARSE ACTIVITIES AND DEVICES   : SUCCESS", bQuietMode);
+
+	cout << prettyheader;
     }
 	
 
