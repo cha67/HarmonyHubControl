@@ -977,7 +977,7 @@ int main(int argc, char * argv[])
 	   resultString=resultString.substr(0, resultString.size()-1);
 	   resultString.append("}");
 	   ofstream activities("activities.json");
-           activities << ("%s\n\n", resultString.c_str());
+           activities << ("%s\n", resultString.c_str());
         }
 
         if( strCommand == "list_devices" || strCommand == "list_devices_raw" )
@@ -986,7 +986,7 @@ int main(int argc, char * argv[])
 	    resultString ="{";
             if( strCommand == "list_devices" )
             {
-                resultString = "Devices Controllable via Harmony : \n\n";
+                cout << "Devices Controllable via Harmony : \n\n";
             }
 
             std::vector< Device >::iterator it = vecDevices.begin();
@@ -1002,7 +1002,7 @@ int main(int argc, char * argv[])
                 resultString=resultString.substr(0, resultString.size()-1);
 	        resultString.append("}");
 		ofstream devices("devices.json");
-		devices << ("%s\n\n", resultString.c_str());
+		devices << ("%s\n", resultString.c_str());
         }
 
         if(strCommand == "list_commands" || strCommand == "list_commands_raw" )
@@ -1011,7 +1011,7 @@ int main(int argc, char * argv[])
             
             if(strCommand == "list_commands")
             {
-                resultString = "Devices Controllable via Harmony with Commands : \n\n";
+                cout << "Devices Controllable via Harmony with Commands : \n\n";
             }
             std::vector< Device >::iterator it = vecDevices.begin();
             std::vector< Device >::iterator ite = vecDevices.end();
@@ -1028,7 +1028,7 @@ int main(int argc, char * argv[])
             
             if(strCommand == "list_device_commands")
             {
-                resultString = "Harmony Commands for Device: \n\n";
+                cout << "Harmony Commands for Device: \n\n";
             }
             
             std::vector< Device >::iterator it = vecDevices.begin();
@@ -1059,7 +1059,7 @@ int main(int argc, char * argv[])
 			filename = strCommandParameterPrimary;
 			filename.append(".json"); 
 			ofstream myfile( filename.c_str() );
-			myfile << ("%s\n\n", resultString.c_str());
+			myfile << ("%s\n", resultString.c_str());
         }
         log("PARSE ACTIVITIES AND DEVICES   : SUCCESS", bQuietMode);
     }
