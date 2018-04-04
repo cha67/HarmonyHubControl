@@ -611,18 +611,13 @@ int submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, s
     return 0;
 }
 
-int parseAction(const std::string& strAction, std::vector<Action>& vecDeviceActions, const std::string& strDeviceID)
+int _parseAction(Json::Value *jAction, std::vector<Action>& vecDeviceActions, const std::string& strDeviceID)
 {
-	Json::Value j_action;
-	Json::Reader jReader;
-	if (!jReader.parse(strAction.c_str(), j_action))
-		return 1;
-
 	Action a;
-	a.m_strName = j_action["name"].asString();
-	a.m_strLabel = j_action["label"].asString();
+	a.m_strName = (*jAction)["name"].asString();
+	a.m_strLabel = (*jAction)["label"].asString();
 
-	std::string actionline = j_action["action"].asString();
+	std::string actionline = (*jAction)["action"].asString();
 
 	std::stringstream ssaction;
 	bool isescape = false;
@@ -637,48 +632,43 @@ int parseAction(const std::string& strAction, std::vector<Action>& vecDeviceActi
 		}
 	}
 
+	Json::Value j_action;
+	Json::Reader jReader;
 	if (!jReader.parse(ssaction.str().c_str(), j_action))
 		return 1;
-	a.m_strCommand = j_action["command"].asString();
 
+	a.m_strCommand = j_action["command"].asString();
 	std::string commandDeviceID = j_action["deviceId"].asString();
 	if(commandDeviceID != strDeviceID)
 		return 1;
+
 	vecDeviceActions.push_back(a);
 	return 0;
 }
 
-int parseFunction(const std::string& strFunction, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
+
+int _parseFunction(Json::Value *jFunction, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
 {
-	Json::Value j_func;
-	Json::Reader jReader;
-	if (!jReader.parse(strFunction.c_str(), j_func))
-		return 1;
-
 	Function f;
-	f.m_strName = j_func["name"].asString();
+	f.m_strName = (*jFunction)["name"].asString();
 
-	size_t l = j_func["function"].size();
+	size_t l = (*jFunction)["function"].size();
 	for (size_t i = 0; i < l; ++i)
 	{
-		parseAction(j_func["function"][(int)(i)].toStyledString(), f.m_vecActions, strDeviceID);
+		_parseAction(&(*jFunction)["function"][(int)(i)], f.m_vecActions, strDeviceID);
 	}	
 	vecDeviceFunctions.push_back(f);
 	return 0;
 }
 
-int parseControlGroup(const std::string& strControlGroup, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
-{
-	Json::Value j_cgrp;
-	Json::Reader jReader;
-	if (!jReader.parse(strControlGroup.c_str(), j_cgrp))
-		return 1;
 
-	size_t l = j_cgrp.size();
+int _parseControlGroup(Json::Value *jControlGroup, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID)
+{
+	size_t l = jControlGroup->size();
 
 	for (size_t i = 0; i < l; ++i)
 	{
-		if(parseFunction(j_cgrp[(int)(i)].toStyledString(), vecDeviceFunctions, strDeviceID) != 0)
+		if(_parseFunction(&(*jControlGroup)[(int)(i)], vecDeviceFunctions, strDeviceID) != 0)
 			return 1;
 	
 	}	
@@ -713,7 +703,7 @@ int parseConfiguration(const std::string& strConfiguration, std::map< std::strin
 		d.m_strModel = j_conf["device"][(int)(i)]["model"].asString();
 
 		// Parse Commands
-		parseControlGroup(j_conf["device"][(int)(i)]["controlGroup"].toStyledString(), d.m_vecFunctions, d.m_strID);
+		_parseControlGroup(&j_conf["device"][(int)(i)]["controlGroup"], d.m_vecFunctions, d.m_strID);
 
 		vecDevices.push_back(d);
 	}
