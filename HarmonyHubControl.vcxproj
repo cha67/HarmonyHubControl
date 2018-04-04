@@ -137,7 +137,13 @@
   <ItemGroup>
     <ClCompile Include="HarmonyHubControl.cpp" />
     <ClCompile Include="csocket.cpp" />
+    <ClCompile Include="jsoncpp\json_writer.cpp" />
+    <ClCompile Include="jsoncpp\json_value.cpp" />
+    <ClCompile Include="jsoncpp\json_reader.cpp" />
   </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+    <ClInclude Include="jsoncpp\json.h" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
