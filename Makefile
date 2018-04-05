@@ -3,7 +3,7 @@
 CC       = $(CROSS_COMPILE)g++
 CFLAGS  +=  -c -Wall $(EXTRAFLAGS)
 LDFLAGS += -lstdc++
-HHC_OBJ  = $(patsubst %.cpp,%.o,$(wildcard *.cpp)) $(patsubst %.cpp,%.o,$(wildcard jsoncpp/*.cpp))
+HHC_OBJ  = $(patsubst %.cpp,%.o,$(wildcard *.cpp)) $(patsubst %.cpp,%.o,$(wildcard HarmonyHubAPI/jsoncpp/*.cpp)) $(patsubst %.cpp,%.o,$(wildcard HarmonyHubAPI/*.cpp))
 DEPS     = $(wildcard *.h) $(wildcard jsoncpp/*.h)
 
 
