@@ -115,8 +115,7 @@ class HarmonyHubAPI
 	bool startCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword);
 	bool swapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken);
 	bool submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string
-			strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string strCommandParameterThird,
-			std::string strCommandParameterFourth, std::string& resultString);
+			strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString);
 
 	const std::string ReadAuthorizationTokenFile();
 	bool WriteAuthorizationTokenFile(const std::string& strAuthorizationToken);

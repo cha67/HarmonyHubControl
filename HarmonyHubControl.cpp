@@ -29,24 +29,61 @@
 #include "HarmonyHubAPI/HarmonyHubAPI.h"
 
 
-#define HARMONY_COMMUNICATION_PORT 5222
-
-
 using namespace std;
 
 
-void log(const char* message, bool bQuiet)
+HarmonyHubAPI hclient;
+
+void log(const std::string message, bool bQuiet)
 {
-	if(bQuiet)
+	if (bQuiet)
+	{
+		if (!hclient.getErrorString().empty())
+		{
+			cout << "{\n   \"status\":\"error\",\n   \"message\":\"" << hclient.getErrorString() << "\"\n}\n";
+		}
+		else if (message.find("FAILURE") != std::string::npos)
+		{
+			cout << "{\n   \"status\":\"error\",\n   \"message\":\"general failure\"\n}\n";
+		}
 		return;
+	}
 
 	cout << message << endl;
 }
 
 
+int usage(int returnstate)
+{
+	const char *suffix = "";
+#if WIN32
+	suffix = ".exe";
+#endif
+	printf("Syntax:\n");
+	printf("HarmonyHubControl%s [harmony_ip] [command]\n", suffix);
+	printf("    where command can be any of the following:\n");
+	printf("        list_activities\n");
+	printf("        list_activities_raw\n");
+	printf("        get_current_activity_id\n");
+	printf("        get_current_activity_id_raw\n");
+	printf("        start_activity <ID>\n");
+	printf("        start_activity_raw <ID>\n");
+	printf("        list_devices\n");
+	printf("        list_devices_raw\n");
+	printf("        list_device_commands <deviceId>\n");
+	printf("        list_device_commands_raw <deviceId>\n");
+	printf("        issue_device_command <deviceId> <command> [...]\n");
+	printf("        issue_device_command_raw <deviceId> <command> [...]\n");
+	printf("        get_config\n");
+	printf("        get_config_raw\n");
+	printf("\n");
+	return returnstate;
+}
+
+
 int main(int argc, char * argv[])
 {
-	HarmonyHubAPI hclient = HarmonyHubAPI();
+	hclient = HarmonyHubAPI();
 
 	ifstream myFile("HarmonyHub.AuthorizationToken");
 	if (myFile.fail()) {
@@ -56,58 +93,81 @@ int main(int argc, char * argv[])
 
 	if (argc < 2)
 	{
-		const char *suffix = "";
-#if WIN32
-		suffix = ".exe";
-#endif
-		printf("Syntax:\n");
-		printf("HarmonyHubControl%s [harmony_ip] [command (optional)]\n", suffix);
-		printf("    where command can be any of the following:\n");
-		printf("        list_activities\n");
-		printf("        list_activities_raw\n");
-		printf("        get_current_activity_id\n");
-		printf("        get_current_activity_id_raw\n");
-		printf("        start_activity [ID]\n");
-		printf("        list_devices\n");
-		printf("        list_devices_raw\n");
-		printf("        list_device_commands [deviceId]\n");
-		printf("        list_device_commands_raw [deviceId]\n");
-		printf("        issue_device_command [deviceId] [command]\n");
-		printf("        get_config\n");
-		printf("        get_config_raw\n");
-		printf("\n");
-		return 0;
+		return usage(0);
 	}
 
 	std::string strUserEmail = "guest@x.com";
 	std::string strUserPassword = "guest";
 	std::string strHarmonyIP = argv[1];
 	std::string strCommand;
-	std::string strCommandParameterPrimary;
-	std::string strCommandParameterSecondary;
-	std::string strCommandParameterThird;
-	std::string strCommandParameterFourth;
+	std::vector<std::string> strCommandParameters;
 
 	// User requested an action to be performed
 	if(argc >= 3)
+	{
 		strCommand = argv[2];
 
-	if(argc >= 4)
-		strCommandParameterPrimary = argv[3];
+		if (strCommand == "turn_off")
+		{
+			strCommand = "start_activity";
+			strCommandParameters[0] = "-1";
+		}
+		else if (
+			(strCommand == "list_activities") ||
+			(strCommand == "list_activities_raw") ||
+			(strCommand == "get_current_activity_id") ||
+			(strCommand == "get_current_activity_id_raw") ||
+			(strCommand == "list_devices") ||
+			(strCommand == "list_devices_raw") ||
+			(strCommand == "get_config") ||
+			(strCommand == "get_config_raw")
+		    )
+		{
+			// all fine here
+		}
+		else if (
+			(strCommand == "start_activity") ||
+			(strCommand == "start_activity_raw") ||
+			(strCommand == "list_device_commands") ||
+			(strCommand == "list_device_commands_raw")
+		    )
+		{
+			// requires a parameter
+			if (argc < 4)
+				return usage(1);
 
-	if(argc >= 5)
-		strCommandParameterSecondary = argv[4];
+			strCommandParameters.push_back(argv[3]);
+		}
+		else if (
+			(strCommand == "issue_device_command") ||
+			(strCommand == "issue_device_command_raw")
+			)
+		{
+			// requires at least 2 parameters
+			if (argc < 5)
+				return usage(1);
 
-	if(argc >= 6)
-		strCommandParameterThird = argv[5];
+			strCommandParameters.push_back(argv[3]);
+			strCommandParameters.push_back(argv[4]);
+			if(argc >= 6)
+			{
+				for (int i = 5; i < argc; i++)
+				{
+					strCommandParameters.push_back(argv[i]);
+				}
+			}
+		}
+		else
+		{
+			// unknown command
+			return usage(1);
+		}
+	}
 
-	if(argc == 7)
-		strCommandParameterFourth = argv[6];
-
-	bool bQuietMode = ((strCommand.length() > 0) && (strCommand.find("_raw") != std::string::npos));
+	bool bQuietMode = ((!strCommand.empty()) && (strCommand.find("_raw") != std::string::npos));
 
 
-	// Read the token
+ 	// Read the token
 	std::string strAuthorizationToken = hclient.ReadAuthorizationTokenFile();
 
 	//printf("\nLogin Authorization Token is: %s\n\n", strAuthorizationToken.c_str());
@@ -119,7 +179,7 @@ int main(int argc, char * argv[])
 		csocket authorizationcsocket;
 		if(!hclient.connectToHarmony(strHarmonyIP, authorizationcsocket))
 		{
-			log("HARMONY COMMUNICATION LOGIN    : FAILURE", false);
+			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
 			cerr << "ERROR : " << hclient.getErrorString() << endl;
 			return 1;
 		}
@@ -139,7 +199,7 @@ int main(int argc, char * argv[])
 		// Log into the Logitech Web Service to retrieve the login authorization token
 		if(hclient.harmonyWebServiceLogin(strUserEmail, strUserPassword, strAuthorizationToken) == 1)
 		{
-			log("LOGITECH WEB SERVICE LOGIN     : FAILURE", false);
+			log("LOGITECH WEB SERVICE LOGIN     : FAILURE", bQuietMode);
 			cerr << "ERROR : " << hclient.getErrorString() << endl;
 			return 1;
 		}
@@ -157,14 +217,14 @@ int main(int argc, char * argv[])
 		csocket authorizationcsocket;
 		if(!hclient.connectToHarmony(strHarmonyIP, authorizationcsocket))
 		{
-			log("HARMONY COMMUNICATION LOGIN    : FAILURE", false);
+			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
 			cerr << "ERROR : " << hclient.getErrorString() << endl;
 			return 1;
 		}
 
 		if(!hclient.swapAuthorizationToken(&authorizationcsocket, strAuthorizationToken))
 		{
-			log("HARMONY COMMUNICATION LOGIN    : FAILURE", false);
+			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
 			cerr << "ERROR : " << hclient.getErrorString() << endl;
 			return 1;
 		}
@@ -184,7 +244,7 @@ int main(int argc, char * argv[])
 	csocket commandcsocket;
 	if(!hclient.connectToHarmony(strHarmonyIP, commandcsocket))
 	{
-		log("HARMONY COMMAND SUBMISSION     : FAILURE", false);
+		log("HARMONY COMMAND SUBMISSION     : FAILURE", bQuietMode);
 		cerr << "ERROR : " << hclient.getErrorString() << endl;
 		return 1;
 	}
@@ -211,16 +271,48 @@ int main(int argc, char * argv[])
 	}
 
 	std::string resultString;
-	if(!hclient.submitCommand(&commandcsocket, strAuthorizationToken, lstrCommand, strCommandParameterPrimary, strCommandParameterSecondary, strCommandParameterThird, strCommandParameterFourth, resultString))
+
+	// fill up to minimum required size
+	while (strCommandParameters.size() < 2)
 	{
-		log("HARMONY COMMAND SUBMISSION     : FAILURE", false);
-		cerr << "ERROR : " << hclient.getErrorString() << endl;
-		return 1;
+		strCommandParameters.push_back("");
 	}
+
+	// run this in a loop to allow sending multiple device commands in sequence
+	// (e.g. channel select with multiple digits)
+	for (size_t i = 1; i < strCommandParameters.size(); i++)
+	{
+		if(!hclient.submitCommand(&commandcsocket, strAuthorizationToken, lstrCommand, strCommandParameters[0], strCommandParameters[i], resultString))
+		{
+			log("HARMONY COMMAND SUBMISSION     : FAILURE", bQuietMode);
+			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			return 1;
+		}
+	}	
+
 	log("HARMONY COMMAND SUBMISSION     : SUCCESS", bQuietMode);
+
+	Json::Value j_result;
+	Json::Reader jReader;
+	jReader.parse(resultString.c_str(), j_result);
+
+	if (lstrCommand.empty() || (lstrCommand.find("activity") != std::string::npos))
+	{
+		std::ofstream current("current.json");
+		current << j_result.toStyledString();
+	}
+
+	if (bQuietMode && resultString.empty())
+	{
+		cout << "{\n   \"status\":\"ok\"\n}\n";
+		return 0;
+	}
 
 	if (lstrCommand == "get_config_raw")
 	{
+		ofstream config("config.json");
+		config << j_result.toStyledString();
+
 		std::string prettyheader="";
 
 		std::map< std::string, std::string> mapActivities;
@@ -228,13 +320,10 @@ int main(int argc, char * argv[])
 
 		if (!hclient.parseConfiguration(resultString, mapActivities, vecDevices))
 		{
-			log("PARSE ACTIVITIES AND DEVICES   : FAILURE", false);
+			log("PARSE ACTIVITIES AND DEVICES   : FAILURE", bQuietMode);
 			cerr << "ERROR : " << hclient.getErrorString() << endl;
 			return 1;
 		}
-
-		ofstream config("config.json");
-		config << resultString << endl;
 
 		if (strCommand == "list_activities" || strCommand == "list_activities_raw")
 		{
@@ -255,7 +344,8 @@ int main(int argc, char * argv[])
 			resultString=resultString.substr(0, resultString.size()-1);
 			resultString.append("}");
 			ofstream activities("activities.json");
-			activities << resultString << endl;
+			jReader.parse(resultString.c_str(), j_result);
+			activities << j_result.toStyledString();
 		}
 
 		if (strCommand == "list_devices" || strCommand == "list_devices_raw")
@@ -277,7 +367,8 @@ int main(int argc, char * argv[])
 			resultString=resultString.substr(0, resultString.size()-1);
 			resultString.append("}");
 			ofstream devices("devices.json");
-			devices << resultString << endl;
+			jReader.parse(resultString.c_str(), j_result);
+			devices << j_result.toStyledString();
 		}
 
 		if (strCommand == "list_commands" || strCommand == "list_commands_raw")
@@ -305,36 +396,34 @@ int main(int argc, char * argv[])
 			std::vector< Device >::iterator ite = vecDevices.end();
 			for (; it != ite; ++it)
 			{
-				if (it->m_strID == strCommandParameterPrimary)
+				if (it->m_strID == strCommandParameters[0])
 				{
-					if(strCommandParameterSecondary.length())
-					{
-						if (strCommandParameterSecondary == it->m_strID)
-						{
-							resultString.append("\"");
-							resultString.append(it->toString());
-						}
-					}
-					else
-					{
-						resultString.append("\"");
-						resultString.append(it->toString());
-					}
+					resultString.append("\"");
+					resultString.append(it->toString());
 					resultString=resultString.substr(0, resultString.size()-1);
 					resultString.append("}" );
 					break;
 				}
 			}
 			string filename;
-			filename = strCommandParameterPrimary;
+			filename = strCommandParameters[0];
 			filename.append(".json");
 			ofstream myfile( filename.c_str() );
-			myfile << resultString << endl;
+			jReader.parse(resultString.c_str(), j_result);
+			myfile << j_result.toStyledString();
 		}
 		log("PARSE ACTIVITIES AND DEVICES   : SUCCESS", bQuietMode);
 		cout << prettyheader;
 	}
 
-	cout << resultString << endl;
+//	cout << resultString << endl;
+//return 0;
+/*
+	Json::Value j_conf;
+	Json::Reader jReader;
+	if (!jReader.parse(resultString.c_str(), j_conf))
+		cout << "error parsing resultstring\n";
+*/
+	cout << j_result.toStyledString();
 	return 0;
 }

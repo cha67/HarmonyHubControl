@@ -389,9 +389,9 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 }
 
 
-bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string strCommandParameterThird, std::string strCommandParameterFourth, std::string& resultString)
+bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString)
 {
-	if (commandcsocket== NULL || strAuthorizationToken.empty())
+	if ((commandcsocket == NULL) || strAuthorizationToken.empty())
 	{
 		errorString = "submitCommand : NULL csocket or empty authorization token provided";
 		return false;
@@ -427,7 +427,7 @@ bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAutho
 		sendData.append(strCommandParameterPrimary.c_str());
 		sendData.append(":timestamp=0</oa></iq>");
 	}
-	else if (lstrCommand == "issue_device_command")
+	if ((lstrCommand == "issue_device_command") || (lstrCommand == "issue_device_command_raw"))
 	{
 		sendData.append("holdAction\">action={\"type\"::\"IRCommand\",\"deviceId\"::\"");
 		sendData.append(strCommandParameterPrimary.c_str());
@@ -437,32 +437,6 @@ bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAutho
 	}
 
 	commandcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
-
-	if (strCommandParameterThird != "")
-	{
-		sendData = "<iq type=\"get\" id=\"";
-		sendData.append(CONNECTION_ID);
-		sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
-		sendData.append("holdAction\">action={\"type\"::\"IRCommand\",\"deviceId\"::\"");
-		sendData.append(strCommandParameterPrimary.c_str());
-		sendData.append("\",\"command\"::\"");
-		sendData.append(strCommandParameterThird.c_str());
-		sendData.append("\"}:status=press</oa></iq>");
-		commandcsocket->write(sendData.c_str(), sendData.length());
-	}
-
-	if (strCommandParameterFourth != "")
-	{
-		sendData = "<iq type=\"get\" id=\"";
-		sendData.append(CONNECTION_ID);
-		sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
-		sendData.append("holdAction\">action={\"type\"::\"IRCommand\",\"deviceId\"::\"");
-		sendData.append(strCommandParameterPrimary.c_str());
-		sendData.append("\",\"command\"::\"");
-		sendData.append(strCommandParameterFourth.c_str());
-		sendData.append("\"}:status=press</oa></iq>");
-		commandcsocket->write(sendData.c_str(), sendData.length());
-	}
 
 	memset(databuffer, 0, 1000000);
 	commandcsocket->read(databuffer, 1000000, false);
@@ -480,21 +454,26 @@ Expect: strData  == <iq/>
 		return false;
 	}
 
+	// Harmony does not return success or failure after issuing a device command
+	if ((lstrCommand == "issue_device_command") || (lstrCommand == "issue_device_command_raw"))
+	{
+		resultString = "";
+		return true;
+	}
+
 	bool bIsDataReadable = false;
 	commandcsocket->canRead(&bIsDataReadable, 0.6f);
 
 	if (!bIsDataReadable && (strData == "<iq/>"))
 		bIsDataReadable = true;
 
-	if (strCommand != "issue_device_command")
+
+	while (bIsDataReadable)
 	{
-		while (bIsDataReadable)
-		{
-			memset(databuffer, 0, 1000000);
-			commandcsocket->read(databuffer, 1000000, false);
-			strData.append(databuffer);
-			commandcsocket->canRead(&bIsDataReadable, 0.3f);
-		}
+		memset(databuffer, 0, 1000000);
+		commandcsocket->read(databuffer, 1000000, false);
+		strData.append(databuffer);
+		commandcsocket->canRead(&bIsDataReadable, 0.3f);
 	}
 
 	resultString = strData;
@@ -508,15 +487,7 @@ Expect: strData  == <iq/>
 		{
 			resultString = resultString.substr(resultStartPos + 7, resultEndPos - resultStartPos - 7);
 			resultString.insert(0, "{\"current activity\":");
-/*
-			if(strCommand == "get_current_activity_id")
-			{
-
-			}
-*/
 			resultString.append("}");
-			std::ofstream current("current.json");
-			current << resultString << std::endl;
 		}
 
 	}
@@ -548,12 +519,7 @@ Expect: strData  == <iq/>
 	else if (lstrCommand == "start_activity" || lstrCommand == "start_activity_raw")
 	{
 		resultString = "{\"current activity\":" + strCommandParameterPrimary + "}";
-		std::ofstream current("current.json");
-		current << resultString << std::endl;
 	}
-	else if (lstrCommand == "issue_device_command")
-		resultString = "";
-
 	return true;
 }
 
