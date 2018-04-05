@@ -60,7 +60,7 @@ csocket::~csocket()
 
 int csocket::resolveHost(const std::string& szRemoteHostName, struct hostent** pHostEnt)
 {
-    if (szRemoteHostName.length() == 0) 
+	if (szRemoteHostName.length() == 0)
     {
         return FAILURE;
     }
@@ -98,7 +98,7 @@ int csocket::resolveHost(const std::string& szRemoteHostName, struct hostent** p
 
 int csocket::connect( const char* remoteHost, unsigned int remotePort )
 {
-    if ( m_socketState != CLOSED ) 
+	if ( m_socketState != CLOSED )
     {
         return ERROR_INAPPROPRIATE_STATE;
     }
@@ -132,7 +132,6 @@ int csocket::connect( const char* remoteHost, unsigned int remotePort )
 #else
     m_socket = socket(AF_INET, SOCK_STREAM, 0);
 #endif
-
     if (m_socket < 0) 
     {
         return FAILURE;
@@ -181,13 +180,13 @@ int csocket::connect( const char* remoteHost, unsigned int remotePort )
 
     m_socketState = CONNECTED;
 
-    return SUCCESS;
+	return SUCCESS;
 }
 
 
 int csocket::canRead( bool* readyToRead, float waitTime )
 {
-    if (m_socketState != CONNECTED )
+	if (m_socketState != CONNECTED )
     {
         return ERROR_INAPPROPRIATE_STATE;
     }
@@ -240,7 +239,7 @@ int csocket::canRead( bool* readyToRead, float waitTime )
 
 int csocket::read( char* pDataBuffer, unsigned int numBytesToRead, bool bReadAll )
 {
-    if (m_socketState != CONNECTED ) 
+	if (m_socketState != CONNECTED )
     {
         return ERROR_INAPPROPRIATE_STATE;
     }
@@ -291,7 +290,7 @@ int csocket::read( char* pDataBuffer, unsigned int numBytesToRead, bool bReadAll
 
 int csocket::write( const char* pDataBuffer, unsigned int numBytesToWrite )
 {
-    if (m_socketState != CONNECTED ) 
+	if (m_socketState != CONNECTED )
     {
         return ERROR_INAPPROPRIATE_STATE;
     }
@@ -299,10 +298,10 @@ int csocket::write( const char* pDataBuffer, unsigned int numBytesToWrite )
     int numBytesRemaining = numBytesToWrite;
     int numBytestWritten = 0;
 
-    while (numBytesRemaining  > 0) 
+	while (numBytesRemaining  > 0)
     {
 #ifdef WIN32
-        numBytestWritten= static_cast<int>(::write( m_socket, pDataBuffer, numBytesRemaining ));
+        numBytestWritten= static_cast<int>(::send( m_socket, pDataBuffer, numBytesRemaining, 0 ));
 #else
         numBytestWritten= ::write( m_socket, pDataBuffer, numBytesRemaining );
 #endif
