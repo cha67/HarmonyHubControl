@@ -1,9 +1,22 @@
-/*
- * HarmonyHub API
- *
- * Source code subject to GNU GENERAL PUBLIC LICENSE version 3
- */
+/******************************************************************************
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
 
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
 
 #include <algorithm>
 #include <string>
@@ -22,10 +35,6 @@
 #define HARMONY_HUB_AUTHORIZATION_TOKEN_FILENAME "HarmonyHub.AuthorizationToken"
 #define CONNECTION_ID "12345678-1234-5678-1234-123456789012-1"
 
-#ifdef _WIN32
-#define localtime_r(timep, result) localtime_s(result, timep)
-#define gmtime_r(timep, result) gmtime_s(result, timep)
-#endif
 
 #ifndef _WIN32
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
@@ -213,9 +222,12 @@ bool HarmonyHubAPI::harmonyWebServiceLogin(std::string strUserEmail, std::string
 	authcsocket.write(strHttpRequestText.c_str(), strHttpRequestText.size());
 	authcsocket.write(strJSONText.c_str(), strJSONText.length());
 
-	memset(databuffer, 0, 1000000);
-	authcsocket.read(databuffer, 1000000, false);
-	strHttpPayloadText = databuffer;/* <- Expect: 0x00def280 "HTTP/1.1 200 OK Server: nginx/1.2.4 Date: Wed, 05 Feb 2014 17:52:13 GMT Content-Type: application/json; charset=utf-8 Content-Length: 127 Connection: keep-alive Cache-Control: private X-AspNet-Version: 4.0.30319 X-Powered-By: ASP.NET  {"GetUserAuthTokenResult":{"AccountId":0,"UserAuthToken":"KsRE6VVA3xrhtbqFbh0jWn8YTiweDeB\/b94Qeqf3ofWGM79zLSr62XQh8geJxw\/V"}}"*/
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	authcsocket.read(databuffer, DATABUFFER_SIZE, false);
+	strHttpPayloadText = databuffer;
+/*
+Expect: 0x00def280 "HTTP/1.1 200 OK Server: nginx/1.2.4 Date: Wed, 05 Feb 2014 17:52:13 GMT Content-Type: application/json; charset=utf-8 Content-Length: 127 Connection: keep-alive Cache-Control: private X-AspNet-Version: 4.0.30319 X-Powered-By: ASP.NET  {"GetUserAuthTokenResult":{"AccountId":0,"UserAuthToken":"KsRE6VVA3xrhtbqFbh0jWn8YTiweDeB\/b94Qeqf3ofWGM79zLSr62XQh8geJxw\/V"}}"
+*/
 
 	// Parse the login authorization token from the response
 	std::string strAuthTokenTag = "UserAuthToken\":\"";
@@ -267,8 +279,8 @@ bool HarmonyHubAPI::startCommunication(csocket* communicationcsocket, std::strin
 	// Start communication
 	std::string data = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
 	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
-	memset(databuffer, 0, 1000000);
-	communicationcsocket->read(databuffer, 1000000, false);
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
 	std::string strData = databuffer;
 /*
@@ -284,8 +296,8 @@ Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='XX
 	data.append("</auth>");
 	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
 
-	memset(databuffer, 0, 1000000);
-	communicationcsocket->read(databuffer, 1000000, false);
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
 	strData = databuffer; /* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
 	if(strData != "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
@@ -297,8 +309,8 @@ Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='XX
 	data = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
 	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
 
-	memset(databuffer, 0, 1000000);
-	communicationcsocket->read(databuffer, 1000000, false);
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
 	strData = databuffer;
 /*
@@ -338,8 +350,8 @@ bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::s
 
 	authorizationcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
 
-	memset(databuffer, 0, 1000000);
-	authorizationcsocket->read(databuffer, 1000000, false);
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
 	strData = databuffer;
 /*
@@ -361,10 +373,16 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 	while (bIsDataReadable)
 	{
-		memset(databuffer, 0, 1000000);
-		authorizationcsocket->read(databuffer, 1000000, false);
-		strData.append(databuffer);
-		authorizationcsocket->canRead(&bIsDataReadable, 0.3f);
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false);
+		std::string strMoreData = std::string(databuffer);
+		if (!strMoreData.empty())
+		{
+			strData.append(databuffer);
+			authorizationcsocket->canRead(&bIsDataReadable, 0.3f);
+		}
+		else
+			bIsDataReadable = false;
 	}
 
 	// Parse the session authorization token from the response
@@ -438,8 +456,8 @@ bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAutho
 
 	commandcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
 
-	memset(databuffer, 0, 1000000);
-	commandcsocket->read(databuffer, 1000000, false);
+	memset(databuffer, 0, DATABUFFER_SIZE);
+	commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
 	strData = databuffer;
 /*
 Expect: strData  == <iq/>
@@ -464,16 +482,18 @@ Expect: strData  == <iq/>
 	bool bIsDataReadable = false;
 	commandcsocket->canRead(&bIsDataReadable, 0.6f);
 
-	if (!bIsDataReadable && (strData == "<iq/>"))
-		bIsDataReadable = true;
-
-
-	while (bIsDataReadable)
+	while (bIsDataReadable == true)
 	{
-		memset(databuffer, 0, 1000000);
-		commandcsocket->read(databuffer, 1000000, false);
-		strData.append(databuffer);
-		commandcsocket->canRead(&bIsDataReadable, 0.3f);
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
+		std::string strMoreData = std::string(databuffer);
+		if (!strMoreData.empty())
+		{
+			strData.append(databuffer);
+			commandcsocket->canRead(&bIsDataReadable, 0.3f);
+		}
+		else
+			bIsDataReadable = false;
 	}
 
 	resultString = strData;
@@ -493,9 +513,21 @@ Expect: strData  == <iq/>
 	}
 	else if (lstrCommand == "get_config" || lstrCommand == "get_config_raw")
 	{
+/*
+ * This is pointless code. Original code tries to get more data from HarmonyHub
+ * but it is highly unlikely that there will be any. Also, because this code
+ * never resets strData any data that might be received here can only confuse
+ * the parser functions.
+ *
+
 		commandcsocket->canRead(&bIsDataReadable, 0.3f);
 
 #ifndef WIN32
+/*
+ * This is really bad practice. Because of an incorrect implementation in csocket canRead()
+ * the original programmer found it necessary to override its return here, causing the
+ * application to stall for quite some time as timeout doesn't appear to be obeyed as well.
+ *
 		bIsDataReadable = true;
 #endif
 
@@ -506,7 +538,7 @@ Expect: strData  == <iq/>
 			strData.append(databuffer);
 			commandcsocket->canRead(&bIsDataReadable, 0.3f);
 		}
-
+*/
 		pos = strData.find("![CDATA[{");
 		if (pos != std::string::npos)
 		{

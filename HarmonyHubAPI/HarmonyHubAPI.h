@@ -1,8 +1,22 @@
-/*
- * HarmonyHub API
- *
- * Source code subject to GNU GENERAL PUBLIC LICENSE version 3
- */
+/******************************************************************************
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
 
 #ifndef _HarmonyHubAPI
 #define _HarmonyHubAPI
@@ -11,6 +25,14 @@
 #include <string>
 #include "jsoncpp/json.h"
 #include "csocket.h"
+
+// Note:
+// HarmonyHub is on Wifi and can thus send frames with a maximum payload length of 2324 bytes
+// Normal implementations will however obey the 1500 bytes MTU from the wired networks that
+// they are attached to and this may be limited even further if the router uses mechanisms like
+// PPTP for connecting the (Wireless) LAN to the internet.
+#define DATABUFFER_SIZE  1500
+
 
 class Action
 {
@@ -92,7 +114,7 @@ class HarmonyHubAPI
 
 	std::string errorString;
 	std::string resultString;
-	char databuffer[1000000];
+	char databuffer[DATABUFFER_SIZE];
 
 
 	static const std::string base64_chars;
