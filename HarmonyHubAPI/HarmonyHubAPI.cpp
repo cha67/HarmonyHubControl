@@ -458,7 +458,7 @@ bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAutho
 
 	memset(databuffer, 0, DATABUFFER_SIZE);
 	commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
-	strData = databuffer;
+	strData = std::string(databuffer);
 /*
 Expect: strData  == <iq/>
 */
@@ -482,7 +482,7 @@ Expect: strData  == <iq/>
 	bool bIsDataReadable = false;
 	commandcsocket->canRead(&bIsDataReadable, 0.6f);
 
-	while (bIsDataReadable == true)
+	while (bIsDataReadable)
 	{
 		memset(databuffer, 0, DATABUFFER_SIZE);
 		commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
@@ -497,6 +497,38 @@ Expect: strData  == <iq/>
 	}
 
 	resultString = strData;
+
+	if (lstrCommand == "start_activity" || lstrCommand == "start_activity_raw")
+	{
+		pos = strData.find("![CDATA[{");
+		if (pos == std::string::npos) // invalid activity
+		{
+			sendData = "<iq type=\"get\" id=\"";
+			sendData.append(CONNECTION_ID);
+			sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
+			sendData.append("getCurrentActivity\" /></iq>");
+			commandcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
+
+			memset(databuffer, 0, DATABUFFER_SIZE);
+			commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
+			strData = std::string(databuffer);
+			commandcsocket->canRead(&bIsDataReadable, 0.3f);
+			if (bIsDataReadable && (strData == "<iq/>"))
+			{
+				memset(databuffer, 0, DATABUFFER_SIZE);
+				commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
+				strData = std::string(databuffer);
+
+				if (lstrCommand == "start_activity")
+					lstrCommand = "get_current_activity_id";
+				else
+					lstrCommand = "get_current_activity_id_raw";
+			}
+			resultString = strData;
+		}
+		else
+			resultString = "{\"current activity\":" + strCommandParameterPrimary + "}";
+	}
 
 	if (lstrCommand == "get_current_activity_id" || lstrCommand == "get_current_activity_id_raw")
 	{
@@ -547,10 +579,6 @@ Expect: strData  == <iq/>
 			else
 				resultString = strData.substr(pos + 8);
 		}
-	}
-	else if (lstrCommand == "start_activity" || lstrCommand == "start_activity_raw")
-	{
-		resultString = "{\"current activity\":" + strCommandParameterPrimary + "}";
 	}
 	return true;
 }
