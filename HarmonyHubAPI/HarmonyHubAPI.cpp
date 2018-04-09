@@ -222,12 +222,17 @@ bool HarmonyHubAPI::harmonyWebServiceLogin(std::string strUserEmail, std::string
 	authcsocket.write(strHttpRequestText.c_str(), strHttpRequestText.size());
 	authcsocket.write(strJSONText.c_str(), strJSONText.length());
 
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	authcsocket.read(databuffer, DATABUFFER_SIZE, false);
-	strHttpPayloadText = databuffer;
+	bool bIsDataReadable = false;
+	authcsocket.canRead(&bIsDataReadable, 0.6f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		authcsocket.read(databuffer, DATABUFFER_SIZE, false);
+		strHttpPayloadText = databuffer;
 /*
 Expect: 0x00def280 "HTTP/1.1 200 OK Server: nginx/1.2.4 Date: Wed, 05 Feb 2014 17:52:13 GMT Content-Type: application/json; charset=utf-8 Content-Length: 127 Connection: keep-alive Cache-Control: private X-AspNet-Version: 4.0.30319 X-Powered-By: ASP.NET  {"GetUserAuthTokenResult":{"AccountId":0,"UserAuthToken":"KsRE6VVA3xrhtbqFbh0jWn8YTiweDeB\/b94Qeqf3ofWGM79zLSr62XQh8geJxw\/V"}}"
 */
+	}
 
 	// Parse the login authorization token from the response
 	std::string strAuthTokenTag = "UserAuthToken\":\"";
@@ -270,6 +275,10 @@ bool HarmonyHubAPI::connectToHarmony(const std::string strHarmonyIPAddress, csoc
 
 bool HarmonyHubAPI::startCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword)
 {
+	bool bIsDataReadable = false;
+	std::string strReq;
+	std::string strData;
+
 	if(communicationcsocket == NULL || strUserName.empty() || strPassword.empty())
 	{
 		errorString = "startCommunication : Invalid communication parameter(s) provided";
@@ -277,45 +286,55 @@ bool HarmonyHubAPI::startCommunication(csocket* communicationcsocket, std::strin
 	}
 
 	// Start communication
-	std::string data = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
-	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
+	strReq = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
+	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
-	std::string strData = databuffer;
+		strData = databuffer;
 /*
 Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='XXXXXXXX' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
 */
+	}
 
-	data = "<auth xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\" mechanism=\"PLAIN\">";
+	strReq = "<auth xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\" mechanism=\"PLAIN\">";
 	std::string tmp = "\0";
 	tmp.append(strUserName);
 	tmp.append("\0");
 	tmp.append(strPassword);
-	data.append(base64_encode(tmp.c_str(), static_cast<unsigned int>(tmp.length())));
-	data.append("</auth>");
-	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
+	strReq.append(base64_encode(tmp.c_str(), static_cast<unsigned int>(tmp.length())));
+	strReq.append("</auth>");
+	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
-	strData = databuffer; /* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
+		strData = databuffer; /* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
+	}
 	if(strData != "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
 	{
 		errorString = "startCommunication : connection error";
 		return false;
 	}
 
-	data = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
-	communicationcsocket->write(data.c_str(), static_cast<unsigned int>(data.length()));
+	strReq = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
+	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
-	strData = databuffer;
+		strData = databuffer;
 /*
 Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='057a30bd' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
 */
+	}
 
 	return true;
 }
@@ -323,6 +342,10 @@ Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='05
 
 bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken)
 {
+	bool bIsDataReadable = false;
+	std::string strData;
+	std::string strReq;
+
 	if (authorizationcsocket == NULL || strAuthorizationToken.empty())
 	{
 		errorString = "swapAuthorizationToken : NULL csocket or empty authorization token provided";
@@ -335,25 +358,26 @@ bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::s
 		return false;
 	}
 
-	std::string strData;
-	std::string sendData;
 
 	// GENERATE A LOGIN ID REQUEST USING THE HARMONY ID AND LOGIN AUTHORIZATION TOKEN
-	sendData = "<iq type=\"get\" id=\"";
-	sendData.append(CONNECTION_ID);
-	sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.connect/vnd.logitech.pair\">token=");
-	sendData.append(strAuthorizationToken.c_str());
-	sendData.append(":name=foo#iOS6.0.1#iPhone</oa></iq>");
+	strReq = "<iq type=\"get\" id=\"";
+	strReq.append(CONNECTION_ID);
+	strReq.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.connect/vnd.logitech.pair\">token=");
+	strReq.append(strAuthorizationToken.c_str());
+	strReq.append(":name=foo#iOS6.0.1#iPhone</oa></iq>");
 
 	std::string strIdentityTokenTag = "identity=";
 	size_t pos = std::string::npos;
 
-	authorizationcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
+	authorizationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	authorizationcsocket->canRead(&bIsDataReadable, 0.3f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false);
 
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
-	strData = databuffer;
+		strData = databuffer;
+	}
 /*
 Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:status=succeeded ...
 */
@@ -364,19 +388,11 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 		 return false;
 	}
 
-	bool bIsDataReadable = false;
 	authorizationcsocket->canRead(&bIsDataReadable, 0.3f);
-	if (!bIsDataReadable && strData == "<iq/>")
-	{
-		bIsDataReadable = true;
-	}
-
 	while (bIsDataReadable)
 	{
 		memset(databuffer, 0, DATABUFFER_SIZE);
-		authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-		std::string strMoreData = std::string(databuffer);
-		if (!strMoreData.empty())
+		if (authorizationcsocket->read(databuffer, DATABUFFER_SIZE, false) > 0)
 		{
 			strData.append(databuffer);
 			authorizationcsocket->canRead(&bIsDataReadable, 0.3f);
@@ -394,7 +410,6 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 	}
 
 	strAuthorizationToken = strData.substr(pos + strIdentityTokenTag.length());
-
 	pos = (int)strAuthorizationToken.find(":status=succeeded");
 	if (pos == std::string::npos)
 	{
@@ -409,6 +424,10 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString)
 {
+	bool bIsDataReadable = false;
+	std::string strData;
+	std::string strReq;
+
 	if ((commandcsocket == NULL) || strAuthorizationToken.empty())
 	{
 		errorString = "submitCommand : NULL csocket or empty authorization token provided";
@@ -423,49 +442,48 @@ bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAutho
 //		return true;
 	}
 
-	std::string strData;
-	std::string sendData;
-
-	sendData = "<iq type=\"get\" id=\"";
-	sendData.append(CONNECTION_ID);
-	sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
+	strReq = "<iq type=\"get\" id=\"";
+	strReq.append(CONNECTION_ID);
+	strReq.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
 
 	// Issue the provided command
 	if (lstrCommand == "get_current_activity_id" || lstrCommand == "get_current_activity_id_raw")
 	{
-		sendData.append("getCurrentActivity\" /></iq>");
+		strReq.append("getCurrentActivity\" /></iq>");
 	}
 	else if (lstrCommand == "get_config_raw")
 	{
-		sendData.append("config\"></oa></iq>");
+		strReq.append("config\"></oa></iq>");
 	}
 	else if (lstrCommand == "start_activity" || strCommand == "start_activity_raw")
 	{
-		sendData.append("startactivity\">activityId=");
-		sendData.append(strCommandParameterPrimary.c_str());
-		sendData.append(":timestamp=0</oa></iq>");
+		strReq.append("startactivity\">activityId=");
+		strReq.append(strCommandParameterPrimary.c_str());
+		strReq.append(":timestamp=0</oa></iq>");
 	}
 	if ((lstrCommand == "issue_device_command") || (lstrCommand == "issue_device_command_raw"))
 	{
-		sendData.append("holdAction\">action={\"type\"::\"IRCommand\",\"deviceId\"::\"");
-		sendData.append(strCommandParameterPrimary.c_str());
-		sendData.append("\",\"command\"::\"");
-		sendData.append(strCommandParameterSecondary.c_str());
-		sendData.append("\"}:status=press</oa></iq>");
+		strReq.append("holdAction\">action={\"type\"::\"IRCommand\",\"deviceId\"::\"");
+		strReq.append(strCommandParameterPrimary.c_str());
+		strReq.append("\",\"command\"::\"");
+		strReq.append(strCommandParameterSecondary.c_str());
+		strReq.append("\"}:status=press</oa></iq>");
 	}
 
-	commandcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
+	commandcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	commandcsocket->canRead(&bIsDataReadable, 0.6f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
+		strData = std::string(databuffer);
 
-	memset(databuffer, 0, DATABUFFER_SIZE);
-	commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
-	strData = std::string(databuffer);
 /*
 Expect: strData  == <iq/>
 */
+	}
 
-	std::string iqTag = "<iq/>";
-	size_t pos = strData.find(iqTag);
-
+	size_t pos = strData.find("<iq/>");
 	if (pos != 0)
 	{
 		errorString = "submitCommand: Invalid Harmony response";
@@ -479,15 +497,11 @@ Expect: strData  == <iq/>
 		return true;
 	}
 
-	bool bIsDataReadable = false;
 	commandcsocket->canRead(&bIsDataReadable, 0.6f);
-
 	while (bIsDataReadable)
 	{
 		memset(databuffer, 0, DATABUFFER_SIZE);
-		commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
-		std::string strMoreData = std::string(databuffer);
-		if (!strMoreData.empty())
+		if (commandcsocket->read(databuffer, DATABUFFER_SIZE, false) > 0)
 		{
 			strData.append(databuffer);
 			commandcsocket->canRead(&bIsDataReadable, 0.3f);
@@ -503,15 +517,18 @@ Expect: strData  == <iq/>
 		pos = strData.find("![CDATA[{");
 		if (pos == std::string::npos) // invalid activity
 		{
-			sendData = "<iq type=\"get\" id=\"";
-			sendData.append(CONNECTION_ID);
-			sendData.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
-			sendData.append("getCurrentActivity\" /></iq>");
-			commandcsocket->write(sendData.c_str(), static_cast<unsigned int>(sendData.length()));
-
-			memset(databuffer, 0, DATABUFFER_SIZE);
-			commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
-			strData = std::string(databuffer);
+			strReq = "<iq type=\"get\" id=\"";
+			strReq.append(CONNECTION_ID);
+			strReq.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.harmony/vnd.logitech.harmony.engine?");
+			strReq.append("getCurrentActivity\" /></iq>");
+			commandcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+			commandcsocket->canRead(&bIsDataReadable, 0.6f);
+			if (bIsDataReadable)
+			{
+				memset(databuffer, 0, DATABUFFER_SIZE);
+				commandcsocket->read(databuffer, DATABUFFER_SIZE, false);
+				strData = std::string(databuffer);
+			}
 			commandcsocket->canRead(&bIsDataReadable, 0.3f);
 			if (bIsDataReadable && (strData == "<iq/>"))
 			{
@@ -555,7 +572,7 @@ Expect: strData  == <iq/>
 		commandcsocket->canRead(&bIsDataReadable, 0.3f);
 
 #ifndef WIN32
-/*
+ *
  * This is really bad practice. Because of an incorrect implementation in csocket canRead()
  * the original programmer found it necessary to override its return here, causing the
  * application to stall for quite some time as timeout doesn't appear to be obeyed as well.
