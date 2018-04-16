@@ -23,6 +23,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <cstring>
 
 
 #include "HarmonyHubAPI.h"
@@ -179,7 +180,7 @@ bool HarmonyHubAPI::WriteAuthorizationTokenFile(const std::string& strAuthorizat
 
 //  Logs into the Logitech Harmony web service
 //  Returns a base64-encoded string containing a 48-byte Login Token in the third parameter
-bool HarmonyHubAPI::harmonyWebServiceLogin(std::string strUserEmail, std::string strPassword, std::string& strAuthorizationToken )
+bool HarmonyHubAPI::HarmonyWebServiceLogin(std::string strUserEmail, std::string strPassword, std::string& strAuthorizationToken )
 {
 	if(strUserEmail.empty() || strPassword.empty())
 	{
@@ -253,7 +254,7 @@ Expect: 0x00def280 "HTTP/1.1 200 OK Server: nginx/1.2.4 Date: Wed, 05 Feb 2014 1
 }
 
 
-bool HarmonyHubAPI::connectToHarmony(const std::string strHarmonyIPAddress, csocket& harmonyCommunicationcsocket)
+bool HarmonyHubAPI::ConnectToHarmony(const std::string strHarmonyIPAddress, csocket& harmonyCommunicationcsocket)
 {
 	if (strHarmonyIPAddress.empty())
 	{
@@ -273,7 +274,7 @@ bool HarmonyHubAPI::connectToHarmony(const std::string strHarmonyIPAddress, csoc
 }
 
 
-bool HarmonyHubAPI::startCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword)
+bool HarmonyHubAPI::StartCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword)
 {
 	bool bIsDataReadable = false;
 	std::string strReq;
@@ -293,54 +294,62 @@ bool HarmonyHubAPI::startCommunication(csocket* communicationcsocket, std::strin
 	{
 		memset(databuffer, 0, DATABUFFER_SIZE);
 		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
 		strData = databuffer;
 /*
-Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='XXXXXXXX' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
+Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='connect.logitech.com' id='12345678' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
 */
 	}
-
-	strReq = "<auth xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\" mechanism=\"PLAIN\">";
-	std::string tmp = "\0";
-	tmp.append(strUserName);
-	tmp.append("\0");
-	tmp.append(strPassword);
-	strReq.append(base64_encode(tmp.c_str(), static_cast<unsigned int>(tmp.length())));
-	strReq.append("</auth>");
-	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
-	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
-	if (bIsDataReadable)
+	if (strData.find("<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>") == std::string::npos)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
-		strData = databuffer; /* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
-	}
-	if(strData != "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
-	{
-		errorString = "startCommunication : connection error";
+		errorString = "startCommunication : unexpected response";
 		return false;
 	}
 
-	strReq = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
+	std::string strAuth = "<auth xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\" mechanism=\"PLAIN\">";
+	std::string strCred = "\0";
+	strCred.append(strUserName);
+	strCred.append("\0");
+	strCred.append(strPassword);
+	strAuth.append(base64_encode(strCred.c_str(), static_cast<unsigned int>(strCred.length())));
+	strAuth.append("</auth>");
+	communicationcsocket->write(strAuth.c_str(), static_cast<unsigned int>(strAuth.length()));
+	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
+	if (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
+		strData = databuffer;
+		/* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
+	}
+	if(strData != "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+	{
+		errorString = "startCommunication : authentication error";
+		return false;
+	}
+
+	//strReq = "<stream:stream to='connect.logitech.com' xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client' xml:lang='en' version='1.0'>";
 	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
 	communicationcsocket->canRead(&bIsDataReadable, 0.3f);
 	if (bIsDataReadable)
 	{
 		memset(databuffer, 0, DATABUFFER_SIZE);
 		communicationcsocket->read(databuffer, DATABUFFER_SIZE, false);
-
 		strData = databuffer;
 /*
-Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='' id='057a30bd' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
+Expect: <stream:stream from='connect.logitech.com' id='12345678' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/><session xmlns='urn:ietf:params:xml:nx:xmpp-session'/></stream:features>
 */
+	}
+	if (strData.find("<bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/>") == std::string::npos)
+	{
+		errorString = "startCommunication : bind failed";
+		return false;
 	}
 
 	return true;
 }
 
 
-bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken)
+bool HarmonyHubAPI::SwapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken)
 {
 	bool bIsDataReadable = false;
 	std::string strData;
@@ -352,7 +361,7 @@ bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::s
 		return false;
 	}
 
-	if (!startCommunication(authorizationcsocket, "guest", "gatorade."))
+	if (!StartCommunication(authorizationcsocket, "guest", "gatorade."))
 	{
 		errorString = "swapAuthorizationToken : Communication failure";
 		return false;
@@ -366,7 +375,6 @@ bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::s
 	strReq.append(strAuthorizationToken.c_str());
 	strReq.append(":name=foo#iOS6.0.1#iPhone</oa></iq>");
 
-	std::string strIdentityTokenTag = "identity=";
 	size_t pos = std::string::npos;
 
 	authorizationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
@@ -379,9 +387,9 @@ bool HarmonyHubAPI::swapAuthorizationToken(csocket* authorizationcsocket, std::s
 		strData = databuffer;
 	}
 /*
-Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:status=succeeded ...
+Expect: <iq/>
 */
-
+std::cout << "a: " << strData << "\n";
 	if (strData.find("<iq/>") != 0)
 	{
 		 errorString = "swapAuthorizationToken : Invalid Harmony response";
@@ -400,17 +408,21 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 		else
 			bIsDataReadable = false;
 	}
+/*
+Expect: <iq id="12345678-1234-5678-1234-123456789012-1" type="get"><oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair' errorcode='200' errorstring='OK'><![CDATA[serverIdentity=12345678-1234-5678-1234-123456789012:hubId=123:identity=12345678-1234-5678-1234-123456789012:status=succeeded:protocolVersion={XMPP="1.0", HTTP="1.0", RF="1.0", WEBSOCKET="1.0"}:hubProfiles={Harmony="2.0"}:productId=Pimento:friendlyName=myHarmony]]></oa></iq>
+*/
 
 	// Parse the session authorization token from the response
-	pos = (int)strData.find(strIdentityTokenTag);
+	pos = (int)strData.find("identity=");
 	if (pos == std::string::npos)
 	{
 		errorString = "swapAuthorizationToken : Logitech Harmony response does not contain a session authorization token";
 		return false;
 	}
+std::cout << "b: " << strData << "\n";
 
-	strAuthorizationToken = strData.substr(pos + strIdentityTokenTag.length());
-	pos = (int)strAuthorizationToken.find(":status=succeeded");
+	strAuthorizationToken = strData.substr(pos + 9);
+	pos = (int)strAuthorizationToken.find(":");
 	if (pos == std::string::npos)
 	{
 		errorString = "swapAuthorizationToken : Logitech Harmony response does not contain a valid session authorization token";
@@ -418,11 +430,12 @@ Expect: <iq/> ... <success xmlns= ... identity=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 	}
 
 	strAuthorizationToken = strAuthorizationToken.substr(0, pos);
+std::cout << "c: " << strAuthorizationToken << "\n";
 	return true;
 }
 
 
-bool HarmonyHubAPI::submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString)
+bool HarmonyHubAPI::SubmitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString)
 {
 	bool bIsDataReadable = false;
 	std::string strData;
@@ -601,6 +614,77 @@ Expect: strData  == <iq/>
 }
 
 
+bool HarmonyHubAPI::SendPing(csocket* commandcsocket, std::string& strAuthorizationToken)
+{
+	if (commandcsocket == NULL || strAuthorizationToken.length() == 0)
+		return false;
+
+	std::string strData;
+	std::string strReq;
+
+	// GENERATE A PING REQUEST USING THE HARMONY ID AND LOGIN AUTHORIZATION TOKEN 
+	strReq = "<iq type=\"get\" id=\"";
+	strReq.append(CONNECTION_ID);
+	strReq.append("\"><oa xmlns=\"connect.logitech.com\" mime=\"vnd.logitech.connect/vnd.logitech.ping\">token=");
+	strReq.append(strAuthorizationToken.c_str());
+	strReq.append(":name=foo#iOS6.0.1#iPhone</oa></iq>");
+
+	commandcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+
+	bool bIsDataReadable = true;
+	commandcsocket->canRead(&bIsDataReadable, 1.0f);
+	while (bIsDataReadable)
+	{
+		memset(databuffer, 0, DATABUFFER_SIZE);
+		if (commandcsocket->read(databuffer, DATABUFFER_SIZE, false) > 0)
+		{
+			strData.append(databuffer);
+			commandcsocket->canRead(&bIsDataReadable, 0.3f);
+		}
+		else
+			bIsDataReadable = false;
+	}
+/* <- Expect: <iq id="12345678-1234-5678-1234-123456789012-1" type="get"><oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping' errorcode='200' errorstring='OK'><![CDATA[status=alive:uuid=12345678-1234-5678-1234-123456789012:susTrigger=xmpp:name=foo#iOS6.0.1#iPhone:id=12345678-1234-5678-1234-123456789012-1:token=12345678-1234-5678-1234-123456789012]]></oa></iq> */
+
+	size_t echostart = strData.find("<iq/>");
+	if (echostart != std::string::npos)
+	{
+		size_t echoend = strData.find("</iq>");
+		if (echoend != std::string::npos)
+			std::string strData = strData.substr(echostart, echoend - echostart);
+	}
+
+	return (strData.find("errorcode='200'") != std::string::npos);
+}
+
+
+std::string HarmonyHubAPI::ReadData(csocket* commandcsocket)
+{
+	if (commandcsocket == NULL)
+		return "<invalid/>";
+
+	std::string strData;
+
+	bool bIsDataReadable = true;
+	commandcsocket->canRead(&bIsDataReadable, 1.0f);
+	if (bIsDataReadable)
+	{
+		while (bIsDataReadable)
+		{
+			memset(databuffer, 0, DATABUFFER_SIZE);
+			if (commandcsocket->read(databuffer, DATABUFFER_SIZE, false) > 0)
+			{
+				strData.append(databuffer);
+				commandcsocket->canRead(&bIsDataReadable, 0.3f);
+			}
+			else
+				bIsDataReadable = false;
+		}
+	}
+	return strData;
+}
+
+
 bool HarmonyHubAPI::_parseAction(Json::Value *jAction, std::vector<Action>& vecDeviceActions, const std::string& strDeviceID)
 {
 	Action a;
@@ -665,7 +749,7 @@ bool HarmonyHubAPI::_parseControlGroup(Json::Value *jControlGroup, std::vector<F
 
 
 
-bool HarmonyHubAPI::parseConfiguration(const std::string& strConfiguration, std::map< std::string, std::string >& mapActivities, std::vector< Device >& vecDevices)
+bool HarmonyHubAPI::ParseConfiguration(const std::string& strConfiguration, std::map< std::string, std::string >& mapActivities, std::vector< Device >& vecDevices)
 {
 	Json::Value j_conf;
 	Json::Reader jReader;
@@ -702,7 +786,7 @@ bool HarmonyHubAPI::parseConfiguration(const std::string& strConfiguration, std:
 
 
 
-std::string HarmonyHubAPI::getErrorString()
+std::string HarmonyHubAPI::GetErrorString()
 {
 	return errorString;
 }

@@ -28,6 +28,11 @@
 #include "HarmonyHubAPI/csocket.h"
 #include "HarmonyHubAPI/HarmonyHubAPI.h"
 
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace std;
 
@@ -38,9 +43,9 @@ void log(const std::string message, bool bQuiet)
 {
 	if (bQuiet)
 	{
-		if (!hclient.getErrorString().empty())
+		if (!hclient.GetErrorString().empty())
 		{
-			cout << "{\n   \"status\":\"error\",\n   \"message\":\"" << hclient.getErrorString() << "\"\n}\n";
+			cout << "{\n   \"status\":\"error\",\n   \"message\":\"" << hclient.GetErrorString() << "\"\n}\n";
 		}
 		else if (message.find("FAILURE") != std::string::npos)
 		{
@@ -177,14 +182,14 @@ int main(int argc, char * argv[])
 	if (strAuthorizationToken.length() > 0)
 	{
 		csocket authorizationcsocket;
-		if(!hclient.connectToHarmony(strHarmonyIP, authorizationcsocket))
+		if(!hclient.ConnectToHarmony(strHarmonyIP, authorizationcsocket))
 		{
 			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 
-		if(hclient.swapAuthorizationToken(&authorizationcsocket, strAuthorizationToken))
+		if(hclient.SwapAuthorizationToken(&authorizationcsocket, strAuthorizationToken))
 		{
 			// Authorization Token found in the file worked.
 			// Bypass authorization through Logitech's servers.
@@ -197,10 +202,10 @@ int main(int argc, char * argv[])
 	if (!bAuthorizationComplete)
 	{
 		// Log into the Logitech Web Service to retrieve the login authorization token
-		if(hclient.harmonyWebServiceLogin(strUserEmail, strUserPassword, strAuthorizationToken) == 1)
+		if(hclient.HarmonyWebServiceLogin(strUserEmail, strUserPassword, strAuthorizationToken) == 1)
 		{
 			log("LOGITECH WEB SERVICE LOGIN     : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 		log("LOGITECH WEB SERVICE LOGIN     : SUCCESS", bQuietMode);
@@ -215,17 +220,17 @@ int main(int argc, char * argv[])
 		// session authorization token
 
 		csocket authorizationcsocket;
-		if(!hclient.connectToHarmony(strHarmonyIP, authorizationcsocket))
+		if(!hclient.ConnectToHarmony(strHarmonyIP, authorizationcsocket))
 		{
 			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 
-		if(!hclient.swapAuthorizationToken(&authorizationcsocket, strAuthorizationToken))
+		if(!hclient.SwapAuthorizationToken(&authorizationcsocket, strAuthorizationToken))
 		{
 			log("HARMONY COMMUNICATION LOGIN    : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 	}
@@ -242,10 +247,10 @@ int main(int argc, char * argv[])
 
 
 	csocket commandcsocket;
-	if(!hclient.connectToHarmony(strHarmonyIP, commandcsocket))
+	if(!hclient.ConnectToHarmony(strHarmonyIP, commandcsocket))
 	{
 		log("HARMONY COMMAND SUBMISSION     : FAILURE", bQuietMode);
-		cerr << "ERROR : " << hclient.getErrorString() << endl;
+		cerr << "ERROR : " << hclient.GetErrorString() << endl;
 		return 1;
 	}
 
@@ -253,7 +258,7 @@ int main(int argc, char * argv[])
 	//strUserName.append("@connect.logitech.com/gatorade.");
 	std::string strPassword = strAuthorizationToken;
 
-	if(!hclient.startCommunication(&commandcsocket, strUserName, strPassword))
+	if(!hclient.StartCommunication(&commandcsocket, strUserName, strPassword))
 	{
 		cerr << "ERROR : Communication failure" << endl;
 		return 1;
@@ -282,10 +287,10 @@ int main(int argc, char * argv[])
 	// (e.g. channel select with multiple digits)
 	for (size_t i = 1; i < strCommandParameters.size(); i++)
 	{
-		if(!hclient.submitCommand(&commandcsocket, strAuthorizationToken, lstrCommand, strCommandParameters[0], strCommandParameters[i], resultString))
+		if(!hclient.SubmitCommand(&commandcsocket, strAuthorizationToken, lstrCommand, strCommandParameters[0], strCommandParameters[i], resultString))
 		{
 			log("HARMONY COMMAND SUBMISSION     : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 	}	
@@ -318,10 +323,10 @@ int main(int argc, char * argv[])
 		std::map< std::string, std::string> mapActivities;
 		std::vector< Device > vecDevices;
 
-		if (!hclient.parseConfiguration(resultString, mapActivities, vecDevices))
+		if (!hclient.ParseConfiguration(resultString, mapActivities, vecDevices))
 		{
 			log("PARSE ACTIVITIES AND DEVICES   : FAILURE", bQuietMode);
-			cerr << "ERROR : " << hclient.getErrorString() << endl;
+			cerr << "ERROR : " << hclient.GetErrorString() << endl;
 			return 1;
 		}
 

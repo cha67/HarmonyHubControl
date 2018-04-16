@@ -130,20 +130,21 @@ class HarmonyHubAPI
 	HarmonyHubAPI();
 	~HarmonyHubAPI();
 
-	bool parseConfiguration(const std::string& strConfiguration, std::map< std::string, std::string >& mapActivities, std::vector< Device >& vecDevices);
+	bool ParseConfiguration(const std::string& strConfiguration, std::map< std::string, std::string >& mapActivities, std::vector< Device >& vecDevices);
 
-	bool harmonyWebServiceLogin(std::string strUserEmail, std::string strPassword, std::string& strAuthorizationToken );
-	bool connectToHarmony(const std::string strHarmonyIPAddress, csocket& harmonyCommunicationcsocket);
-	bool startCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword);
-	bool swapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken);
-	bool submitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string
+	bool HarmonyWebServiceLogin(std::string strUserEmail, std::string strPassword, std::string& strAuthorizationToken );
+	bool ConnectToHarmony(const std::string strHarmonyIPAddress, csocket& harmonyCommunicationcsocket);
+	bool StartCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword);
+	bool SwapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken);
+	bool SubmitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string
 			strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString);
 
 	const std::string ReadAuthorizationTokenFile();
 	bool WriteAuthorizationTokenFile(const std::string& strAuthorizationToken);
+	bool SendPing(csocket* commandcsocket, std::string& strAuthorizationToken);
+	std::string ReadData(csocket* commandcsocket);
 
-	std::string getErrorString();
-
+	std::string GetErrorString();
 
 };
 
