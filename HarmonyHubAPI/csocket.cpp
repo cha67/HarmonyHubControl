@@ -1,7 +1,10 @@
 #include "csocket.h"
-
+#include <cstring>
+#include <iostream>
 
 #ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <io.h>
 #else
 #include <sys/socket.h>
@@ -10,36 +13,44 @@
 #include <netdb.h>
 #include <errno.h>
 #include <sys/time.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <unistd.h>
-#endif
-#if __APPLE__
-#include <netdb.h>
-#include <arpa/inet.h>
+#include <fcntl.h>
+#include <poll.h>
 #endif
 
+
+
+#ifndef WIN32
 #undef INVALID_SOCKET
-#define INVALID_SOCKET (unsigned int)(~0)
+#define INVALID_SOCKET (int)(~0)
+#endif
+
 #define BLOCK_RETRY_INTERVAL_MSECS 1
 #define ERROR_INAPPROPRIATE_STATE -1
 
-static bool s_bSocketsInitialized = false;;
+#ifdef WIN32
+static bool s_bSocketsInitialized = false;
+#endif
+
+#define SUCCESS     0
+#define FAILURE     1
 
 
 csocket::csocket() : m_socketState(CLOSED),
 					 m_remotePort(0)
 {
+#ifdef WIN32
 	if (!s_bSocketsInitialized)
 	{
-#ifdef WIN32
 		WORD socketVersion;
 		WSADATA socketData;
 		int err;
 
 		socketVersion = MAKEWORD(2, 0);
 		err = WSAStartup(socketVersion, &socketData);
-#endif
 	}
+#endif
 
 	m_socket = 0;
 }
@@ -58,117 +69,173 @@ csocket::~csocket()
 }
 
 
-int csocket::resolveHost(const std::string& szRemoteHostName, struct hostent** pHostEnt)
+
+int csocket::resolveHost(const std::string& szRemoteHostName, struct sockaddr_in& sa)
 {
 	if (szRemoteHostName.length() == 0)
-	{
 		return FAILURE;
-	}
 
-	if ( ! s_bSocketsInitialized )
-	{
 #ifdef WIN32
+	if (!s_bSocketsInitialized)
+	{
 		WORD wVersionRequested;
 		WSADATA wsaData;
 		int err;
 
 		wVersionRequested = MAKEWORD(2, 0);
 		err = WSAStartup(wVersionRequested, &wsaData);
+	}
 #endif
-	}
 
-	*pHostEnt = gethostbyname( szRemoteHostName.c_str() );
-
-	if (*pHostEnt == NULL)
+	struct addrinfo *addr;
+	if (getaddrinfo(szRemoteHostName.c_str() , "0", 0, &addr) == 0)
 	{
-		unsigned long uhostname = inet_addr ( szRemoteHostName.c_str() );
-		*pHostEnt = gethostbyaddr(reinterpret_cast<char *>(&uhostname),	sizeof(unsigned long), AF_INET);
-
-		if (*pHostEnt == NULL)
-		{
-			return FAILURE;
-		}
+		struct sockaddr_in *saddr = (((struct sockaddr_in *)addr->ai_addr));
+		sa.sin_family = saddr->sin_family;
+		memcpy(&sa, saddr, sizeof(sockaddr_in));
+/*
+#ifdef WIN32
+		char address[INET6_ADDRSTRLEN];
+		inet_ntop(saddr->sin_family, &(saddr->sin_addr), address, sizeof(address));
+		inet_pton(saddr->sin_family, address, &sa.sin_addr);
+#endif
+*/
+		return SUCCESS;
 	}
+	else
+	{
+		sa.sin_family = AF_INET;
+		if (inet_pton(sa.sin_family, szRemoteHostName.c_str(), &sa.sin_addr) == 1)
+			return SUCCESS;
+		sa.sin_family = AF_INET6;
+		if (inet_pton(sa.sin_family, szRemoteHostName.c_str(), &sa.sin_addr) == 1)
+			return SUCCESS;
+	}	
 
-	return SUCCESS;
+	return FAILURE;
 }
 
 
-int csocket::connect( const char* remoteHost, unsigned int remotePort )
+int csocket::connect( const char* remoteHost, const unsigned int remotePort )
 {
-	if ( m_socketState != CLOSED )
-	{
-		return ERROR_INAPPROPRIATE_STATE;
-	}
-
-	struct hostent *pHostEnt = NULL;
-	int status = resolveHost(remoteHost, &pHostEnt);
-	if (status == FAILURE || !pHostEnt)
-	{
-		return FAILURE;
-	}
-
 	m_strRemoteHost = remoteHost;
 	m_remotePort = remotePort;
 
-	m_remoteSocketAddr.sin_family = pHostEnt->h_addrtype;
-	memcpy((char *) &m_remoteSocketAddr.sin_addr.s_addr,
-		pHostEnt->h_addr_list[0],
-		pHostEnt->h_length);
+	if ( m_socketState != CLOSED ) 
+		return ERROR_INAPPROPRIATE_STATE;
 
-	m_remoteSocketAddr.sin_port = htons(m_remotePort);
-
+	int status = resolveHost(remoteHost, m_remoteSocketAddr);
+	if (status == FAILURE )
+		return FAILURE;
 
 #ifdef WIN32
 	m_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0 , 0 , 0);
-
-	if (m_socket == INVALID_SOCKET)
-	{
-		return FAILURE;
-	}
 #else
 	m_socket = socket(AF_INET, SOCK_STREAM, 0);
 #endif
-	if (m_socket < 0)
-	{
-		return FAILURE;
-	}
 
-	m_localSocketAddr.sin_family = AF_INET;
+	if (m_socket == INVALID_SOCKET)
+	        return FAILURE;
 
-	m_localSocketAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+	// create local socket
 	int iRecvTimeout = 1;
-	setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO,
-		(char*) &iRecvTimeout, sizeof(iRecvTimeout) );
-
+	m_localSocketAddr.sin_family = m_remoteSocketAddr.sin_family;
+	m_localSocketAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	m_localSocketAddr.sin_port = htons(0);
+	setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, (char*) &iRecvTimeout, sizeof(iRecvTimeout));
 
-	status = bind(m_socket, (const sockaddr*)&(m_localSocketAddr), sizeof(struct sockaddr) );
+	status = bind(m_socket, (const sockaddr*)&(m_localSocketAddr), sizeof(struct sockaddr));
 
-	if (status < 0)
-	{
+	if (status < 0) 
 		return FAILURE;
-	}
 
-#ifdef WIN32
+#ifdef WIN32 
 	int set = 1;
-	setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*) &set, sizeof(set));
+	setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY,  (char*) &set, sizeof(set) );
 #endif
 
-	m_remoteSocketAddr.sin_family = pHostEnt->h_addrtype;
-	memcpy(&(m_remoteSocketAddr.sin_addr), pHostEnt->h_addr, pHostEnt->h_length);
-	m_remoteSocketAddr.sin_port = htons( m_remotePort );
-	status = ::connect(m_socket, (const sockaddr*)&(m_remoteSocketAddr), sizeof(m_remoteSocketAddr));
+	// connect to remote socket
+	m_remoteSocketAddr.sin_port = htons(m_remotePort);
+
+	// do a non-blocking connect and return success or fail after no more than 5 seconds
+
+#ifdef WIN32
+	unsigned long nonblock = 1;
+	ioctlsocket(m_socket, FIONBIO, &nonblock);
+	status = ::connect(m_socket, (const sockaddr*)&(m_remoteSocketAddr), sizeof(sockaddr_in));
+	if (status < 0)
+	{
+		if (WSAGetLastError() != WSAEWOULDBLOCK)
+			return FAILURE;
+
+		fd_set fdw, fdr, fde;
+		FD_ZERO(&fdw);
+		FD_ZERO(&fdr);
+		FD_ZERO(&fde);
+		FD_SET(m_socket, &fdw);
+		FD_SET(m_socket, &fdr);
+		FD_SET(m_socket, &fde);
+
+		timeval tv;
+		tv.tv_sec = 3;
+		tv.tv_usec = 0;
+		int rc = select(m_socket + 1, &fdw, &fdr, &fde, &tv);
+
+		if (rc <= 0) // 0 = timeout; less than zero is error (should I do something with state 'errno == EINTR' here?)
+			return FAILURE;
+
+		// try to get socket options
+		int so_error;
+		socklen_t len = sizeof so_error;
+		if (getsockopt(m_socket, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) < 0)
+			return FAILURE;
+
+		if (so_error != 0)
+			return FAILURE;
+	}
+
+	// restore blocking mode on socket
+	nonblock = 0;
+	ioctlsocket(m_socket, FIONBIO, &nonblock);
+
+	m_socketState = CONNECTED;
+	return SUCCESS;
+#else
+	fcntl(m_socket, F_SETFL, O_NONBLOCK);
+	status = ::connect(m_socket, (const sockaddr*)&(m_remoteSocketAddr), sizeof(sockaddr_in));
 
 	if (status < 0)
 	{
-		return FAILURE;
+		if (errno != EINPROGRESS)
+			return FAILURE;
+
+		struct pollfd fds;
+		fds.fd = m_socket;
+		fds.events = POLLERR | POLLOUT;
+		fds.revents = 0;
+		int rc = poll(&fds, 1, 3000);
+
+		if (rc <= 0) // 0 = timeout; less than zero is error (should I do something with state 'errno == EINTR' here?)
+			return FAILURE;
+
+		// try to get socket options
+		int so_error;
+		socklen_t len = sizeof so_error;
+		if (getsockopt(m_socket, SOL_SOCKET, SO_ERROR, &so_error, &len) < 0)
+			return FAILURE;
+
+		if (so_error != 0)
+			return FAILURE;
 	}
 
-	m_socketState = CONNECTED;
+	// restore blocking mode on socket
+	long socketMode = fcntl(m_socket, F_GETFL, NULL);
+	socketMode &= (~O_NONBLOCK);
+	fcntl(m_socket, F_SETFL, socketMode);
 
+	m_socketState = CONNECTED;
 	return SUCCESS;
+#endif
 }
 
 
