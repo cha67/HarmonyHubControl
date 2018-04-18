@@ -34,6 +34,10 @@
 #define DATABUFFER_SIZE  1500
 
 
+#define TIMEOUT_WAIT_FOR_ANSWER 1.0f
+#define TIMEOUT_WAIT_FOR_NEXT_FRAME 0.3f
+
+
 class Action
 {
 public:
@@ -143,6 +147,7 @@ class HarmonyHubAPI
 	bool WriteAuthorizationTokenFile(const std::string& strAuthorizationToken);
 	bool SendPing(csocket* commandcsocket, std::string& strAuthorizationToken);
 	std::string ReadData(csocket* commandcsocket);
+	std::string ReadData(csocket* commandcsocket, float waitTime);
 
 	std::string GetErrorString();
 

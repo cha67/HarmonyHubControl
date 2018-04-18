@@ -36,10 +36,6 @@
 #define HARMONY_HUB_AUTHORIZATION_TOKEN_FILENAME "HarmonyHub.AuthorizationToken"
 #define CONNECTION_ID "12345678-1234-5678-1234-123456789012-1"
 
-#define TIMEOUT_WAIT_FOR_ANSWER 1.0f
-#define TIMEOUT_WAIT_FOR_NEXT_FRAME 0.3f
-
-
 #ifndef _WIN32
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
@@ -644,13 +640,17 @@ bool HarmonyHubAPI::SendPing(csocket* commandcsocket, std::string& strAuthorizat
 
 std::string HarmonyHubAPI::ReadData(csocket* commandcsocket)
 {
+	return ReadData(commandcsocket, TIMEOUT_WAIT_FOR_ANSWER);
+}
+std::string HarmonyHubAPI::ReadData(csocket* commandcsocket, float waitTime)
+{
 	if (commandcsocket == NULL)
 		return "<invalid/>";
 
 	std::string strData;
 
 	bool bIsDataReadable = true;
-	commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
+	commandcsocket->canRead(&bIsDataReadable, waitTime);
 	if (bIsDataReadable)
 	{
 		while (bIsDataReadable)
