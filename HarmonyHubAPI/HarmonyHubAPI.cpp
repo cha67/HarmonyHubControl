@@ -36,6 +36,9 @@
 #define HARMONY_HUB_AUTHORIZATION_TOKEN_FILENAME "HarmonyHub.AuthorizationToken"
 #define CONNECTION_ID "12345678-1234-5678-1234-123456789012-1"
 
+#define TIMEOUT_WAIT_FOR_ANSWER 1.0f
+#define TIMEOUT_WAIT_FOR_NEXT_FRAME 0.3f
+
 #ifndef _WIN32
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif

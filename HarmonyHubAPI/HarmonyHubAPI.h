@@ -34,10 +34,6 @@
 #define DATABUFFER_SIZE  1500
 
 
-#define TIMEOUT_WAIT_FOR_ANSWER 1.0f
-#define TIMEOUT_WAIT_FOR_NEXT_FRAME 0.3f
-
-
 class Action
 {
 public:
