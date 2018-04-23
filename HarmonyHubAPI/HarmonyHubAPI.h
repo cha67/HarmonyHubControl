@@ -114,7 +114,7 @@ class HarmonyHubAPI
 
 	std::string errorString;
 	std::string resultString;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[DATABUFFER_SIZE + 1];
 
 
 	static const std::string base64_chars;
@@ -125,6 +125,8 @@ class HarmonyHubAPI
 	bool _parseAction(Json::Value *jAction, std::vector<Action>& vecDeviceActions, const std::string& strDeviceID);
 	bool _parseFunction(Json::Value *jFunction, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID);
 	bool _parseControlGroup(Json::Value *jControlGroup, std::vector<Function>& vecDeviceFunctions, const std::string& strDeviceID);
+	bool CheckIqGood(const std::string& strData);
+
 
 	public:
 	HarmonyHubAPI();
