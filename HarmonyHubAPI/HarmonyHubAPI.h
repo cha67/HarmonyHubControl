@@ -26,13 +26,6 @@
 #include "jsoncpp/json.h"
 #include "csocket.h"
 
-// Note:
-// HarmonyHub is on Wifi and can thus send frames with a maximum payload length of 2324 bytes
-// Normal implementations will however obey the 1500 bytes MTU from the wired networks that
-// they are attached to and this may be limited even further if the router uses mechanisms like
-// PPTP for connecting the (Wireless) LAN to the internet.
-#define DATABUFFER_SIZE  1500
-
 
 class Action
 {
@@ -113,9 +106,6 @@ class HarmonyHubAPI
 	private:
 
 	std::string errorString;
-	std::string resultString;
-	char databuffer[DATABUFFER_SIZE + 1];
-
 
 	static const std::string base64_chars;
 	static inline bool is_base64(unsigned char c);
