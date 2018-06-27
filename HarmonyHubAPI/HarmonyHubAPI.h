@@ -127,6 +127,7 @@ class HarmonyHubAPI
 	bool HarmonyWebServiceLogin(std::string strUserEmail, std::string strPassword, std::string& strAuthorizationToken );
 	bool ConnectToHarmony(const std::string strHarmonyIPAddress, csocket& harmonyCommunicationcsocket);
 	bool StartCommunication(csocket* communicationcsocket, std::string strUserName, std::string strPassword);
+	bool CloseCommunication(csocket* communicationcsocket);
 	bool SwapAuthorizationToken(csocket* authorizationcsocket, std::string& strAuthorizationToken);
 	bool SubmitCommand(csocket* commandcsocket, std::string& strAuthorizationToken, std::string strCommand, std::string
 			strCommandParameterPrimary, std::string strCommandParameterSecondary, std::string& resultString);

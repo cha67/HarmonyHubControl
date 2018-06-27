@@ -58,16 +58,23 @@ csocket::csocket() : m_socketState(CLOSED),
 
 csocket::~csocket()
 {
-	if (m_socketState != csocket::CLOSED)
+	close();
+}
+
+
+void csocket::close()
+{
+	 if ( m_socketState != csocket::CLOSED && m_socketState != csocket::ERRORED)
 	{
 #ifdef WIN32
 		closesocket(m_socket);
 #else
 		::close(m_socket);
 #endif
+		m_socketState = CLOSED;
+		m_socket = 0;
 	}
 }
-
 
 
 int csocket::resolveHost(const std::string& szRemoteHostName, struct sockaddr_in& sa)

@@ -33,11 +33,7 @@
 // Normal implementations will however obey the 1500 bytes MTU from the wired networks that
 // they are attached to and this may be limited even further if the router uses mechanisms like
 // PPTP for connecting the (Wireless) LAN to the internet.
-#define READBUFFER_SIZE  1500
-
-// Our data buffer needs to have one additional byte to always allow us to use it as a string
-#define DATABUFFER_SIZE  READBUFFER_SIZE + 1
-
+#define SOCKET_BUFFER_SIZE  1500
 
 // socket timeout values
 #define TIMEOUT_WAIT_FOR_ANSWER 1.0f
@@ -204,7 +200,7 @@ bool HarmonyHubAPI::HarmonyWebServiceLogin(std::string strUserEmail, std::string
 	}
 
 	std::string strHttpPayloadText;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	// Build JSON request
 	std::string strJSONText = "{\"email\":\"";
@@ -240,9 +236,8 @@ bool HarmonyHubAPI::HarmonyWebServiceLogin(std::string strUserEmail, std::string
 	authcsocket.canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		authcsocket.read(databuffer, READBUFFER_SIZE, false);
-		strHttpPayloadText = databuffer;
+		int bytesReceived = authcsocket.read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strHttpPayloadText = std::string(databuffer, bytesReceived);
 /*
 Expect: 0x00def280 "HTTP/1.1 200 OK Server: nginx/1.2.4 Date: Wed, 05 Feb 2014 17:52:13 GMT Content-Type: application/json; charset=utf-8 Content-Length: 127 Connection: keep-alive Cache-Control: private X-AspNet-Version: 4.0.30319 X-Powered-By: ASP.NET  {"GetUserAuthTokenResult":{"AccountId":0,"UserAuthToken":"KsRE6VVA3xrhtbqFbh0jWn8YTiweDeB\/b94Qeqf3ofWGM79zLSr62XQh8geJxw\/V"}}"
 */
@@ -292,11 +287,11 @@ bool HarmonyHubAPI::StartCommunication(csocket* communicationcsocket, std::strin
 	bool bIsDataReadable = false;
 	std::string strReq;
 	std::string strData;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	if(communicationcsocket == NULL || strUserName.empty() || strPassword.empty())
 	{
-		errorString = "startCommunication : Invalid communication parameter(s) provided";
+		errorString = "StartCommunication : Invalid communication parameter(s) provided";
 		return false;
 	}
 
@@ -306,16 +301,15 @@ bool HarmonyHubAPI::StartCommunication(csocket* communicationcsocket, std::strin
 	communicationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		communicationcsocket->read(databuffer, READBUFFER_SIZE, false);
-		strData = databuffer;
+		int bytesReceived = communicationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
 /*
 Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='connect.logitech.com' id='12345678' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>
 */
 	}
 	if (strData.find("<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>") == std::string::npos)
 	{
-		errorString = "startCommunication : unexpected response";
+		errorString = "StartCommunication : unexpected response";
 		return false;
 	}
 
@@ -330,14 +324,13 @@ Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='connect.
 	communicationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		communicationcsocket->read(databuffer, READBUFFER_SIZE, false);
-		strData = databuffer;
+		int bytesReceived = communicationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
 		/* <- Expect: <success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/> */
 	}
 	if(strData != "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
 	{
-		errorString = "startCommunication : authentication error";
+		errorString = "StartCommunication : authentication error";
 		return false;
 	}
 
@@ -346,20 +339,50 @@ Expect: <?xml version='1.0' encoding='iso-8859-1'?><stream:stream from='connect.
 	communicationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		communicationcsocket->read(databuffer, READBUFFER_SIZE, false);
-		strData = databuffer;
+		int bytesReceived = communicationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
 /*
 Expect: <stream:stream from='connect.logitech.com' id='12345678' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'><stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/><session xmlns='urn:ietf:params:xml:nx:xmpp-session'/></stream:features>
 */
 	}
 	if (strData.find("<bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/>") == std::string::npos)
 	{
-		errorString = "startCommunication : bind failed";
+		errorString = "StartCommunication : bind failed";
 		return false;
 	}
 
 	return true;
+}
+
+
+bool HarmonyHubAPI::CloseCommunication(csocket* communicationcsocket)
+{
+	bool bIsDataReadable = false;
+	std::string strReq;
+	std::string strData;
+	char databuffer[SOCKET_BUFFER_SIZE];
+
+	if(communicationcsocket == NULL)
+	{
+		errorString = "CloseCommunication : Invalid communication parameter(s) provided";
+		return false;
+	}
+
+	// Close stream
+	strReq = "</stream:stream>";
+	communicationcsocket->write(strReq.c_str(), static_cast<unsigned int>(strReq.length()));
+	communicationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
+	while (bIsDataReadable)
+	{
+		int bytesReceived = communicationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
+		if ((bytesReceived == 0) || (strData == "</stream:stream>"))
+			break;
+		else
+			communicationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
+	}
+	communicationcsocket->close();
+	return (strData == "</stream:stream>");
 }
 
 
@@ -368,7 +391,7 @@ bool HarmonyHubAPI::SwapAuthorizationToken(csocket* authorizationcsocket, std::s
 	bool bIsDataReadable = false;
 	std::string strData;
 	std::string strReq;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	if (authorizationcsocket == NULL || strAuthorizationToken.empty())
 	{
@@ -396,10 +419,8 @@ bool HarmonyHubAPI::SwapAuthorizationToken(csocket* authorizationcsocket, std::s
 	authorizationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		authorizationcsocket->read(databuffer, READBUFFER_SIZE, false);
-
-		strData = databuffer;
+		int bytesReceived = authorizationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
 	}
 /*
 Expect: <iq/>
@@ -414,10 +435,10 @@ Expect: <iq/>
 	authorizationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	while (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		if (authorizationcsocket->read(databuffer, READBUFFER_SIZE, false) > 0)
+		int bytesReceived = authorizationcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		if (bytesReceived > 0)
 		{
-			strData.append(databuffer);
+			strData.append(databuffer, 0, bytesReceived);
 			authorizationcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 		}
 		else
@@ -453,7 +474,7 @@ bool HarmonyHubAPI::SubmitCommand(csocket* commandcsocket, std::string& strAutho
 	bool bIsDataReadable = false;
 	std::string strData;
 	std::string strReq;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	if ((commandcsocket == NULL) || strAuthorizationToken.empty())
 	{
@@ -501,9 +522,8 @@ bool HarmonyHubAPI::SubmitCommand(csocket* commandcsocket, std::string& strAutho
 	commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	if (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		commandcsocket->read(databuffer, READBUFFER_SIZE, false);
-		strData = std::string(databuffer);
+		int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		strData = std::string(databuffer, bytesReceived);
 
 /*
 Expect: strData  == <iq/>
@@ -527,17 +547,15 @@ Expect: strData  == <iq/>
 	commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	while (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		int ret = commandcsocket->read(databuffer, READBUFFER_SIZE, false);
-		if (ret > 0)
+		int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		if (bytesReceived > 0)
 		{
-			strData.append(databuffer);
+			strData.append(databuffer, 0, bytesReceived);
 			commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 		}
 		else
 			bIsDataReadable = false;
 	}
-
 	resultString = strData;
 
 	if (lstrCommand == "start_activity" || lstrCommand == "start_activity_raw")
@@ -553,16 +571,14 @@ Expect: strData  == <iq/>
 			commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 			if (bIsDataReadable)
 			{
-				memset(databuffer, 0, DATABUFFER_SIZE);
-				commandcsocket->read(databuffer, READBUFFER_SIZE, false);
-				strData = std::string(databuffer);
+				int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+				strData = std::string(databuffer, bytesReceived);
 			}
 			commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 			if (bIsDataReadable && (strData == "<iq/>"))
 			{
-				memset(databuffer, 0, DATABUFFER_SIZE);
-				commandcsocket->read(databuffer, READBUFFER_SIZE, false);
-				strData = std::string(databuffer);
+				int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+				strData = std::string(databuffer, bytesReceived);
 
 				if (lstrCommand == "start_activity")
 					lstrCommand = "get_current_activity_id";
@@ -590,14 +606,14 @@ Expect: strData  == <iq/>
 	}
 	else if (lstrCommand == "get_config" || lstrCommand == "get_config_raw")
 	{
+		// seems redundant, but is apparently needed sometimes
 		commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 		while (bIsDataReadable)
 		{
-			memset(databuffer, 0, DATABUFFER_SIZE);
-			int ret = commandcsocket->read(databuffer, READBUFFER_SIZE, false);
-			if (ret > 0)
+			int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+			if (bytesReceived > 0)
 			{
-				strData.append(databuffer);
+				strData.append(databuffer, 0, bytesReceived);
 				commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 			}
 			else
@@ -624,7 +640,7 @@ bool HarmonyHubAPI::SendPing(csocket* commandcsocket, std::string& strAuthorizat
 
 	std::string strData;
 	std::string strReq;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	// GENERATE A PING REQUEST USING THE HARMONY ID AND LOGIN AUTHORIZATION TOKEN 
 	strReq = "<iq type=\"get\" id=\"";
@@ -639,10 +655,10 @@ bool HarmonyHubAPI::SendPing(csocket* commandcsocket, std::string& strAuthorizat
 	commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_ANSWER);
 	while (bIsDataReadable)
 	{
-		memset(databuffer, 0, DATABUFFER_SIZE);
-		if (commandcsocket->read(databuffer, READBUFFER_SIZE, false) > 0)
+		int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+		if (bytesReceived > 0)
 		{
-			strData.append(databuffer);
+			strData = std::string(databuffer, bytesReceived);
 			commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 		}
 		else
@@ -650,7 +666,6 @@ bool HarmonyHubAPI::SendPing(csocket* commandcsocket, std::string& strAuthorizat
 	}
 /* <- Expect: <iq id="12345678-1234-5678-1234-123456789012-1" type="get"><oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping' errorcode='200' errorstring='OK'><![CDATA[status=alive:uuid=12345678-1234-5678-1234-123456789012:susTrigger=xmpp:name=foo#iOS6.0.1#iPhone:id=12345678-1234-5678-1234-123456789012-1:token=12345678-1234-5678-1234-123456789012]]></oa></iq> */
 
-std::cout << strData << "\n";
 	return CheckIqGood(strData);
 }
 
@@ -658,11 +673,13 @@ std::cout << strData << "\n";
 bool HarmonyHubAPI::CheckIqGood(const std::string& strData)
 {
 	size_t iqstart = 0;
+	bool ret = false;
 	while (1)
 	{
 		iqstart = strData.find("<iq ", iqstart);
 		if (iqstart == std::string::npos)
-			return true;
+			break;
+		ret = true;
 		size_t iqend = strData.find("</iq>", iqstart);
 		if (iqend == std::string::npos)
 			return false;
@@ -674,7 +691,7 @@ bool HarmonyHubAPI::CheckIqGood(const std::string& strData)
 			continue;
 		return false;
 	}
-	return true;
+	return ret;
 }
 
 
@@ -688,7 +705,7 @@ std::string HarmonyHubAPI::ReadData(csocket* commandcsocket, float waitTime)
 		return "<invalid/>";
 
 	std::string strData;
-	char databuffer[DATABUFFER_SIZE];
+	char databuffer[SOCKET_BUFFER_SIZE];
 
 	bool bIsDataReadable = true;
 	commandcsocket->canRead(&bIsDataReadable, waitTime);
@@ -696,10 +713,10 @@ std::string HarmonyHubAPI::ReadData(csocket* commandcsocket, float waitTime)
 	{
 		while (bIsDataReadable)
 		{
-			memset(databuffer, 0, DATABUFFER_SIZE);
-			if (commandcsocket->read(databuffer, READBUFFER_SIZE, false) > 0)
+			int bytesReceived = commandcsocket->read(databuffer, SOCKET_BUFFER_SIZE, false);
+			if (bytesReceived > 0)
 			{
-				strData.append(databuffer);
+				strData.append(databuffer, 0, bytesReceived);
 				commandcsocket->canRead(&bIsDataReadable, TIMEOUT_WAIT_FOR_NEXT_FRAME);
 			}
 			else
